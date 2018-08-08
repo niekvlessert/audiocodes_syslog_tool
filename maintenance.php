@@ -60,11 +60,26 @@ function vacuumCurrentTables(){
 	}
 }
 
-// delete options
-function deleteOptionRecords(){}
-//do this query
-//select substring(main.message from E'\\[[^]]*\\]') as number from systemevents main, systemevents secondary WHERE substring(main.message from 3 for 20) = substring(secondary.message from 3 for 20) AND secondary.message LIKE '%OPTIONS sip%';
-//foreach delete where like;
+function deleteOptionRecords(){
+        global $devices_to_log;
+	global $dbhost, $dbname, $dbuser, $dbpass;
+	$db = pg_connect("host=$dbhost port=5432 dbname=$dbname user=$dbuser password=$dbpass") or die("error");
+
+	foreach ($devices_to_log as $name => $ip) {
+		#$query=pg_escape_string("select substring(main.message from E'\\[[^]]*\\]') as number from systemevents_$name main, systemevents_$name secondary WHERE substring(main.message from 3 for 20) = substring(secondary.message from 3 for 20) AND secondary.message LIKE '%OPTIONS sip%'");
+		#$result = pg_prepare($db, "my_query", "select substring(main.message from $1) as number from systemevents_$name main, systemevents_$name secondary WHERE substring(main.message from 3 for 20) = substring(secondary.message from 3 for 20) AND secondary.message LIKE '%OPTIONS sip%'");
+		#$result = pg_execute($db, "my_query", array("E'\\[[^]]*\\]'"));
+		#$query = "select secondary.message from systemevents_$name main, systemevents_$name secondary WHERE substring(main.message from 3 for 20) = substring(secondary.message from 3 for 20) AND secondary.message LIKE '%OPTIONS sip%'";
+		$query = "select message from systemevents_test_niek where message like '%OPTIONS sip%';";
+		$result = pg_query($db, $query);
+		while ($row = pg_fetch_row($result)){
+			//var_dump($row[0]);
+			$message = preg_match("/\[(.*)\]/",$row[0], $match);
+			$query2 = "delete from systemevents_$name where message like '%$match[1]%'";
+			$result2 = pg_query($db, $query2);
+		}
+	}
+}
 
 function generateRsyslogConfig(){
         global $devices_to_log;
