@@ -40,7 +40,7 @@ cp 00_audiocodes.conf /etc/rsyslog.d
 service rsyslog restart
 ```
 
-Now setup the Audiocodes device to log syslog data to the IP address of your machine and have a look in the databases because data should be appearing with:
+Now setup the Audiocodes device to log syslog data to the IP address of your machine and have a look in the database because data should be appearing with:
 ```
 psql -U syslog
 select * from systemevents_<devicename>;
