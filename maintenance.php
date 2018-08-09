@@ -39,13 +39,15 @@ function tableRotate(){
 	$date = date("Ymd");
 	$db = pg_connect("host=$dbhost port=5432 dbname=$dbname user=$dbuser password=$dbpass") or die("error");
 
-	foreach ($devices_to_log as $device){
+	foreach ($devices_to_log as $name => $ip){
 		$result = pg_query($db, "begin");
-		$result = pg_query($db, "create table systemevents_".$device."_new (like systemevents_$device);");
-		$result = pg_query($db, "alter table systemevents_$device rename to systemevents_".$device."_".$date);
-		$result = pg_query($db, "alter table systemevents_".$device."_new rename to systemevents_".$device);
+		$result = pg_query($db, "create table systemevents_".$name."_new (like systemevents_$name);");
+		$result = pg_query($db, "alter table systemevents_$name rename to systemevents_".$name."_".$date);
+		$result = pg_query($db, "alter table systemevents_".$name."_new rename to systemevents_".$name);
 		$result = pg_query($db, "commit");
-		echo "systemevents_$device rotated.\n";
+		sleep (2);
+		$result = pg_query($db, "alter table systemevents_".$name." alter column id set default nextval('systemevents_".$name."_id_seq')"); //auto nextval doesn't come along..
+		echo "systemevents_$name rotated.\n";
 	}
 }
 
@@ -99,7 +101,10 @@ function generateRsyslogConfig(){
 
 	if (file_exists($filename)) unlink($filename);
 
-	$data = "\$WorkDirectory /var/tmp\n";
+	$data = "\$ModLoad imudp\n";
+	$data .= "\$UDPServerRun 514\n";
+	$data .= "\$ModLoad ompgsql\n";
+	$data .= "\$WorkDirectory /var/tmp\n";
 	$data .= "\$ActionQueueType LinkedList # use asynchronous processing\n";
 	$data .= "\$ActionQueueFileName dbq    # set file name, also enables disk mode\n";
 	$data .= "\$ActionResumeRetryCount -1   # infinite retries on insert failure\n";
@@ -107,7 +112,7 @@ function generateRsyslogConfig(){
 	foreach ($devices_to_log as $name => $ip) {
 		$data.="\$template $name,\"insert into SystemEvents_$name (Message, Facility, FromHost, Priority, DeviceReportedTime, ReceivedAt, InfoUnitID, SysLogTag) values ('%msg%', %syslogfacility%, '%HOSTNAME%', %syslogpriority%, '%timereported:::date-pgsql%', '%timegenerated:::date-pgsql%', %iut%, '%syslogtag%')\",STDSQL\n";
 		$data.="if \$fromhost-ip startswith '$ip' then :ompgsql:127.0.0.1,syslog,syslog,syslog;$name\n";
-		$data.="&~\n";
+		$data.="& ~\n";
 	}
 	file_put_contents($filename, $data);
 }
@@ -131,14 +136,21 @@ function initializeDatabase(){
 	
 	$db = pg_connect("host=$dbhost port=5432 dbname=$dbname user=$dbuser password=$dbpass") or die("error");
 
-	foreach ($devices_to_log as $key => $device) {
-		$query="CREATE TABLE SystemEvents_$key ( ID serial not null primary key, CustomerID bigint, ReceivedAt timestamp without time zone NULL, DeviceReportedTime timestamp without time zone NULL, Facility smallint NULL, Priority smallint NULL, FromHost varchar(60) NULL, Message text, NTSeverity int NULL, Importance int NULL, EventSource varchar(60), EventUser varchar(60) NULL, EventCategory int NULL, EventID int NULL, EventBinaryData text NULL, MaxAvailable int NULL, CurrUsage int NULL, MinUsage int NULL, MaxUsage int NULL, InfoUnitID int NULL , SysLogTag varchar(60), EventLogType varchar(60), GenericFileName VarChar(60), SystemID int NULL );";
+	foreach ($devices_to_log as $name => $device) {
+		$query="CREATE TABLE SystemEvents_$name ( ID serial not null primary key, CustomerID bigint, ReceivedAt timestamp without time zone NULL, DeviceReportedTime timestamp without time zone NULL, Facility smallint NULL, Priority smallint NULL, FromHost varchar(60) NULL, Message text, NTSeverity int NULL, Importance int NULL, EventSource varchar(60), EventUser varchar(60) NULL, EventCategory int NULL, EventID int NULL, EventBinaryData text NULL, MaxAvailable int NULL, CurrUsage int NULL, MinUsage int NULL, MaxUsage int NULL, InfoUnitID int NULL , SysLogTag varchar(60), EventLogType varchar(60), GenericFileName VarChar(60), SystemID int NULL );";
 		$result = @pg_query($query);
-		if (strpos(pg_last_error($db), "already exists")>0) echo "Table Systemevents_$key already exists...\n";
+		if (strpos(pg_last_error($db), "already exists")>0) echo "Table Systemevents_$name already exists...\n"; else echo "Table Systemevents_$name created.\n";
 
-		$query="CREATE TABLE SystemEventsProperties_$key ( ID serial not null primary key, SystemEventID int NULL , ParamName varchar(255) NULL , ParamValue text NULL);";
+		$query="CREATE TABLE SystemEvents_".$name."_cdr ( ID serial not null primary key, CustomerID bigint, ReceivedAt timestamp without time zone NULL, DeviceReportedTime timestamp without time zone NULL, Facility smallint NULL, Priority smallint NULL, FromHost varchar(60) NULL, Message text, NTSeverity int NULL, Importance int NULL, EventSource varchar(60), EventUser varchar(60) NULL, EventCategory int NULL, EventID int NULL, EventBinaryData text NULL, MaxAvailable int NULL, CurrUsage int NULL, MinUsage int NULL, MaxUsage int NULL, InfoUnitID int NULL , SysLogTag varchar(60), EventLogType varchar(60), GenericFileName VarChar(60), SystemID int NULL );";
 		$result = @pg_query($query);
-		if (strpos(pg_last_error($db), "already exists")>0) echo "Table SystemeventsProperties_$key already exists...\n";
+		if (strpos(pg_last_error($db), "already exists")>0) echo "Table Systemevents_".$name."_cdr already exists...\n"; else echo "Table Systemevents_".$name."_cdr created.\n";
+		$result = pg_query($db, "alter table systemevents_".$name."_cdr alter column id set default nextval('systemevents_".$name."_cdr_id_seq')"); //auto nextval doesn't come along..
+
+		$query="CREATE TABLE SystemEventsProperties_$name ( ID serial not null primary key, SystemEventID int NULL , ParamName varchar(255) NULL , ParamValue text NULL);";
+		$result = @pg_query($query);
+		if (strpos(pg_last_error($db), "already exists")>0) echo "Table SystemeventsProperties_$name already exists...\n"; else echo "Table SystemeventsProperties_$name created.\n";
+
+		$result = pg_query($db, "alter table systemevents_".$name." alter column id set default nextval('systemevents_".$name."_id_seq')"); //auto nextval doesn't come along..
 	}
 }
 ?>
