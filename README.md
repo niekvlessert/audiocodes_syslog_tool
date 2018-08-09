@@ -41,10 +41,10 @@ service rsyslog restart
 ```
 
 Now setup the Audiocodes device to log syslog data to the IP address of your machine and have a look in the databases because data should be appearing with:
-
+```
 psql -U syslog
 select * from systemevents_<devicename>;
-
+```
 To delete the option data pooring in a cronjob is needed. It's also required to vacuum the tables to avoid wasting disk space. And the tables need to be rotated; one table for every day.
 So add the following cronjobs witch `crontab -e`
 ```
