@@ -16,6 +16,7 @@ It needs some installation work. A script has been included to do some of the ha
 
 On CentOS 6 it boils down to something like this after a clean installation. You will obviously end up with not the most secure setup, improve if you desire more security...
 
+```
 yum install postgresql php php-pgsql rsyslog rsyslog-pgsql apache2 postgresql-server mlocate git
 cd
 git clone https://github.com/niekvlessert/audiocodes_syslog_tool
@@ -37,6 +38,7 @@ php maintenance.php initializeDatabase
 php maintenance.php generateRsyslogConfig
 cp 00_audiocodes.conf /etc/rsyslog.d
 service rsyslog restart
+```
 
 Now setup the Audiocodes device to log syslog data to the IP address of your machine and have a look in the databases because data should be appearing with:
 
@@ -44,16 +46,17 @@ psql -U syslog
 select * from systemevents_<devicename>;
 
 To delete the option data pooring in a cronjob is needed. It's also required to vacuum the tables to avoid wasting disk space. And the tables need to be rotated; one table for every day.
-So add the following cronjobs witch 'crontab -e'
+So add the following cronjobs witch `crontab -e`
+```
 0 0 * * * /usr/bin/php ~/audiocodes_syslog_tool/maintenance.php tableRotate
 2 * * * * /usr/bin/php ~/audiocodes_syslog_tool/maintenance.php deleteOptionRecords
 5 * * * * /usr/bin/php ~/audiocodes_syslog_tool/maintenance.php vacuumCurrentTables
-
+```
 Now all data needed for the GUI should be coming in. Copy the following files to the root directory of the webserver:
-
+```
 cp config.php /var/www/html
 cp index.php /var/www/html
-
+```
 Now visit your webserver address and have a look.
 
 Usage
