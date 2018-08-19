@@ -39,14 +39,31 @@ height:1000px;
 
 </style>
 <body>
-<center><h1>Audicodes syslog searcher</h2></center>
+<?
+
+require "config.php";
+
+ini_set('display_errors',1);
+ini_set('display_startup_errors',1);
+error_reporting(E_ALL);
+
+?>
+
+<center><h1>Audicodes Syslog Tool</h2></center>
 
 <div id="number_form" class="number_form">
 <div id="call_info1">
 <form id='form' method=get>
 <table>
 <tr><td>Number to search starts with:</td><td><input id='number' name='number' type=number id='number'></td></tr>
-<tr><td>Device:</td><td><select name=device><option>crf</option></select></td></tr>
+<tr><td>Device:</td><td><select name=device>
+<?
+foreach ($devices_to_log as $name => $ip) {
+	echo "<option>$name</option>";
+}
+?>
+</select></td></tr>
+
 <tr><td>Latest call only:</td><td><input id='last_one_only' name='last_one_only' type=checkbox></td></tr>
 <tr><td>The usual stuff only:</td><td><input id='usual_stuff_only' name='usual_stuff_only' type=checkbox></td></tr>
 </table>
@@ -131,12 +148,6 @@ function checkCombinations(e){
 
 <?
 
-require "config.php";
-
-ini_set('display_errors',1);
-ini_set('display_startup_errors',1);
-error_reporting(E_ALL);
-
 @$number = $_GET['number'];
 @$sid = $_GET['SID'];
 if (strlen($number)>0 || $sid) {
@@ -155,14 +166,15 @@ if (strlen($number)>0 || $sid) {
 
 	$db = pg_connect("host=$dbhost port=5432 dbname=$dbname user=$dbuser password=$dbpass") or die("error");
 	$query = NULL;
-	if ($latest_call_only) $query = "select main.message, main.devicereportedtime, main.fromhost, main.id FROM systemevents_$device main WHERE substring(main.message from 3 for 20) = (select substring(secondary.message from 3 for 20) from systemevents_$device secondary where secondary.message LIKE '%INVITE sip:$number%' order by id desc limit 1);";
-	if ($sid) $query = "select main.message, main.devicereportedtime, main.fromhost, main.id FROM systemevents_$device main WHERE substring(main.message from 3 for 20) = (select substring(secondary.message from 3 for 20) from systemevents_$device secondary where secondary.message LIKE '%$sid%' and secondary.message LIKE '%INVITE sip:%' order by id desc limit 1);";
-	if (!$query) $query = "select distinct on (substring(message from 3 for 20)) substring(message from 3 for 20) as sid, substring(message, 'sip:([^@]+)@') as number, devicereportedtime as time from systemevents_$device where message like '%INVITE sip:$number%' order by substring(message from 3 for 20), id;";
+	if ($latest_call_only) $query = "select main.message, main.devicereportedtime, main.fromhost, main.id FROM systemevents_$device main WHERE substring(main.message from 3 for 21) = (select substring(secondary.message from 3 for 21) from systemevents_$device secondary where secondary.message LIKE '%INVITE sip:$number%' order by id desc limit 1);";
+	if ($sid) $query = "select main.message, main.devicereportedtime, main.fromhost, main.id FROM systemevents_$device main WHERE substring(main.message from 3 for 21) = (select substring(secondary.message from 3 for 21) from systemevents_$device secondary where secondary.message LIKE '%$sid%' and secondary.message LIKE '%INVITE sip:%' order by id desc limit 1);";
+	if (!$query) $query = "select distinct on (substring(message from 3 for 21)) substring(message from 3 for 21) as sid, substring(message, 'sip:([^@]+)@') as number, devicereportedtime as time from systemevents_$device where message like '%INVITE sip:$number%' order by substring(message from 3 for 21), id;";
 	
 	#if (!$query) $query = "select distinct on (substring(message from 3 for 20)) substring(message from 3 for 20) as sid, substring(message, 'sip:([^@]+)@') as number, substring(message, '\[Time:(.*)\]') as time from systemevents_$device where message like '%INVITE sip:$number%' order by substring(message from 3 for 20), id;";
 	//$query = "select distinct(main.message), main.devicereportedtime, main.fromhost, main.id FROM systemevents main, systemevents secondary WHERE substring(main.message from 3 for 20) = substring(secondary.message from 3 for 20) AND secondary.message LIKE '%INVITE sip:$number%' order by id asc;";
 	//echo "console.log('".addslashes($query)."');\n";
 
+	echo "console.log(\"$query\");\n";
         $result = pg_query($db, $query);
 
         $sid_logged = false;
@@ -227,7 +239,9 @@ if (strlen($number)>0 || $sid) {
 			echo "callog.push(siddata);\n";
 		}
 	} else {
-		if (pg_num_rows($result)>1) {
+		$result_amount = pg_num_rows($result);
+		echo "console.log($result_amount);\n";
+		if (pg_num_rows($result)>0) {
 			echo "</script>";
 			echo "Calls found, please select:<br/><br/>";
 			echo "<form>";
@@ -250,9 +264,7 @@ if (strlen($number)>0 || $sid) {
 if (latest_call_only) document.getElementById("last_one_only").checked = true;
 if (usual_stuff_only) document.getElementById("usual_stuff_only").checked = true;
 if (number) document.getElementById("number").value = number;
-</script>
 
-<script>
 function addRow(i) {
         var div = document.createElement('div');
 	var message = callog[i].message;
@@ -410,10 +422,11 @@ async function drawSip() {
 	var sip_message = {};
 	sip_message.direction = "";
 	callog.forEach(function(item) {
+		console.log(item.message);
 		if (item.messagetype === "-null-") {
 			if (sip_message_found) {
 				sip_message.message += item.message;
-				//console.log("sip message related to previous one... content added.");
+				console.log("sip message related to previous one... content added.");
 			} else {
 				var split_message = item.message.split("#012");
 				var split_action = split_message[0].split(" ");
@@ -430,7 +443,7 @@ async function drawSip() {
 					}
 					if (split_action[1].lastIndexOf("@") !== -1) sip_message.dst_number = split_action[1].substring(split_action[1].indexOf(":")+1, split_action[1].indexOf("@"));
 					else sip_message.dst_number = "";
-					//console.log("INVITE detected to " + sip_message.dst + " to number " + sip_message.dst_number);
+					console.log("INVITE detected to " + sip_message.dst + " to number " + sip_message.dst_number);
 					//console.log(split_message);
 					for (var i = 0; i < split_message.length; i++) {
 						if (split_message[i].indexOf('User-Agent')>-1) sip_message.user_agent = split_message[i].substring(split_message[i].indexOf(":")).slice(2,-1);
@@ -468,9 +481,9 @@ async function drawSip() {
 		if (item.messagetype === "sip_stack") {
 			if (item.message.split(" ")[0] === "----") {
 				if (sip_message.direction !== "") {
-					//console.log("------------------------------------------------------");
+					console.log("------------------------------------------------------");
 					sip_dialog_information.push(sip_message);
-					//console.log(sip_message);
+					console.log(sip_message);
 					sip_message = {};
 					split_action = [];
 					split_message = [];
@@ -479,9 +492,9 @@ async function drawSip() {
 				sip_message.direction = split_message[1];
 				if (sip_message.direction === "Outgoing") sip_message.dst = split_message[5];
 				else sip_message.src = split_message[5];
-				//console.log("dst found: " + sip_message.dst);
-				//console.log("sip stack msg... direction: " +sip_message.direction);
-			       	//if (sip_message.src) console.log("src: " + sip_message.src); else console.log("dst: "+ sip_message.dst);
+				console.log("dst found: " + sip_message.dst);
+				console.log("sip stack msg... direction: " +sip_message.direction);
+				if (sip_message.src) console.log("src: " + sip_message.src); else console.log("dst: "+ sip_message.dst);
 				sip_message_found = false;
 			}
 		}
@@ -530,7 +543,9 @@ async function drawSip() {
 
 			vertical_line.ip_address = sip_dialog_information[i].src;
 			//console.log(sip_dialog_information[i].src.indexOf(":"));
-			var ip_address = sip_dialog_information[i].src.slice(0,sip_dialog_information[i].src.indexOf(":"));
+			var ip_address;
+			if (sip_dialog_information[i].src) ip_address = sip_dialog_information[i].src.slice(0,sip_dialog_information[i].src.indexOf(":"));
+			else ip_address = "";
 			var device = device_data_bundle.filter(function(device){return device.ip === ip_address;});
 			if (device[0]) vertical_line.device_name = device[0].name;
 			else {

@@ -54,9 +54,9 @@ function vacuumCurrentTables(){
 	global $dbhost, $dbname, $dbuser, $dbpass;
 	$db = pg_connect("host=$dbhost port=5432 dbname=$dbname user=$dbuser password=$dbpass") or die("error");
 
-	foreach ($devices_to_log as $device) {
-		$result = pg_query($db, "vacuum systemevents_$device");
-		echo "systemevents_$device vacuum complete.\n";
+	foreach ($devices_to_log as $name => $ip) {
+		$result = pg_query($db, "vacuum systemevents_$name");
+		echo "systemevents_$name vacuum complete.\n";
 	}
 }
 
@@ -66,31 +66,48 @@ function deleteOptionRecords(){
 	$db = pg_connect("host=$dbhost port=5432 dbname=$dbname user=$dbuser password=$dbpass") or die("error");
 
 	foreach ($devices_to_log as $name => $ip) {
+		$result = pg_query($db, "vacuum systemevents_$name");
 		#$query=pg_escape_string("select substring(main.message from E'\\[[^]]*\\]') as number from systemevents_$name main, systemevents_$name secondary WHERE substring(main.message from 3 for 20) = substring(secondary.message from 3 for 20) AND secondary.message LIKE '%OPTIONS sip%'");
 		#$result = pg_prepare($db, "my_query", "select substring(main.message from $1) as number from systemevents_$name main, systemevents_$name secondary WHERE substring(main.message from 3 for 20) = substring(secondary.message from 3 for 20) AND secondary.message LIKE '%OPTIONS sip%'");
 		#$result = pg_execute($db, "my_query", array("E'\\[[^]]*\\]'"));
 		#$query = "select secondary.message from systemevents_$name main, systemevents_$name secondary WHERE substring(main.message from 3 for 20) = substring(secondary.message from 3 for 20) AND secondary.message LIKE '%OPTIONS sip%'";
-		$query = "select message from systemevents_test_niek where message like '%OPTIONS sip%';";
+		$query = "select message from systemevents_$name where message like '%OPTIONS sip%';";
 		$result = pg_query($db, $query);
+		echo "Options records to delete for $name: ".pg_num_rows($result)."\n";
+		$a = 0;
+		echo "Every dot is 100 OPTIONS SIDs deleted.\n";
 		while ($row = pg_fetch_row($result)){
 			//var_dump($row[0]);
 			$message = preg_match("/\[(.*)\]/",$row[0], $match);
 			$query2 = "delete from systemevents_$name where message like '%$match[1]%'";
+			$a++;
+			if ($a==100) { 
+				echo ".";
+				$a = 0;
+			}
+			//echo $query2."\n";
 			$result2 = pg_query($db, $query2);
 		}
+		echo "\n";
+		$result = pg_query($db, "vacuum systemevents_$name");
 	}
 }
 
 function generateRsyslogConfig(){
         global $devices_to_log;
 	$filename = "00_audiocodes.conf";
-	$data = "";
 
 	if (file_exists($filename)) unlink($filename);
+
+	$data = "\$WorkDirectory /var/tmp\n";
+	$data .= "\$ActionQueueType LinkedList # use asynchronous processing\n";
+	$data .= "\$ActionQueueFileName dbq    # set file name, also enables disk mode\n";
+	$data .= "\$ActionResumeRetryCount -1   # infinite retries on insert failure\n";
 
 	foreach ($devices_to_log as $name => $ip) {
 		$data.="\$template $name,\"insert into SystemEvents_$name (Message, Facility, FromHost, Priority, DeviceReportedTime, ReceivedAt, InfoUnitID, SysLogTag) values ('%msg%', %syslogfacility%, '%HOSTNAME%', %syslogpriority%, '%timereported:::date-pgsql%', '%timegenerated:::date-pgsql%', %iut%, '%syslogtag%')\",STDSQL\n";
 		$data.="if \$fromhost-ip startswith '$ip' then :ompgsql:127.0.0.1,syslog,syslog,syslog;$name\n";
+		$data.="&~\n";
 	}
 	file_put_contents($filename, $data);
 }
