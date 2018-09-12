@@ -36,7 +36,7 @@ function stop(){
 function tableRotate(){
 	global $devices_to_log;
 	global $dbhost, $dbname, $dbuser, $dbpass;
-	$date = date("Ymd");
+	$date = date("Ymd",strtotime("-1 days"));
 	$db = pg_connect("host=$dbhost port=5432 dbname=$dbname user=$dbuser password=$dbpass") or die("error");
 
 	foreach ($devices_to_log as $name => $ip){

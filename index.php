@@ -146,6 +146,7 @@ function checkCombinations(e){
 			sip_dialog_displayed = true;
 		}*/
 		window.scrollTo(0, 0);
+		shown_id = 0;
 	}
 	if ((e.key === "n" || e.key === "N") && shown_id < horizontal_lines.length) jumpTo(++shown_id);
 	if ((e.key === "p" || e.key === "P") && shown_id>1) jumpTo(--shown_id);
@@ -180,7 +181,8 @@ if (strlen($number)>0 || $sid) {
 	if ($latest_call_only) $query = "select main.message, main.devicereportedtime, main.fromhost, main.id FROM systemevents_$device main WHERE substring(main.message from 3 for $sid_length) = (select substring(secondary.message from 3 for $sid_length) from systemevents_$device secondary where secondary.message LIKE '%INVITE sip:%$number%' order by id desc limit 1);";
 	if ($sid) $query = "select main.message, main.devicereportedtime, main.fromhost, main.id FROM systemevents_$device main WHERE substring(main.message from 3 for $sid_length) = (select substring(secondary.message from 3 for $sid_length) from systemevents_$device secondary where secondary.message LIKE '%$sid%' and secondary.message LIKE '%INVITE sip:%' order by secondary.id desc limit 1) order by main.id;";
 	#if (!$query) $query = "select distinct on (substring(message from 3 for $sid_length)) substring(message from 3 for $sid_length) as sid, substring(message, 'sip:([^@]+)@') as number, devicereportedtime as time from systemevents_$device where message like '%INVITE sip:%$number%' order by substring(message from 3 for $sid_length), id;";
-	if (!$query) $query = "select distinct on (substring(message from 3 for $sid_length)) substring(message from 3 for $sid_length) as sid, substring(message, 'sip:([^@]+)@') as number, devicereportedtime as time from systemevents_$device where message ~ E'INVITE sip:\\d{0,10}".$number."\\d{0,10}' order by substring(message from 3 for $sid_length), id;";
+	#if (!$query) $query = "select distinct on (substring(message from 3 for $sid_length)) substring(message from 3 for $sid_length) as sid, substring(message, 'sip:([^@]+)@') as number, devicereportedtime as time from systemevents_$device where message ~ E'INVITE sip:\\d{0,10}".$number."\\d{0,10}' order by substring(message from 3 for $sid_length), id;";
+	if (!$query) $query = "select dsturibeforemap, sessionid, setuptime from systemevents_$device"."_cdr_formatted where dsturibeforemap like '%$number%' or srcuri like '%$number%' or dsturi like '%$number%'";
 	
 	#if (!$query) $query = "select distinct on (substring(message from 3 for 20)) substring(message from 3 for 20) as sid, substring(message, 'sip:([^@]+)@') as number, substring(message, '\[Time:(.*)\]') as time from systemevents_$device where message like '%INVITE sip:$number%' order by substring(message from 3 for 20), id;";
 	//$query = "select distinct(main.message), main.devicereportedtime, main.fromhost, main.id FROM systemevents main, systemevents secondary WHERE substring(main.message from 3 for 20) = substring(secondary.message from 3 for 20) AND secondary.message LIKE '%INVITE sip:$number%' order by id asc;";
@@ -265,8 +267,9 @@ if (strlen($number)>0 || $sid) {
 			echo "<table border=0>";
 			while ($row = pg_fetch_assoc($result)) {
 				//var_dump($row);
+				preg_match('/(.*?)@/', $row['dsturibeforemap'], $search_result);
 				echo "<tr><td>";
-				echo "<a href='index.php?".$row['sid']."&device=".$device."'>".$row['number']." at ".$row['time']."</a>";
+				echo "<a href='index.php?SID=".trim($row['sessionid'])."&device=".$device."'>".trim($search_result[0],"@")." at ".$row['setuptime']."</a>";
 				echo "</td></tr>";
 				//echo "console.log(\""+$row['number']+"\");";
 			}
