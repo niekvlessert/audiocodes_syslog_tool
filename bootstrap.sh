@@ -50,8 +50,11 @@ if (( $? == 0 ));
 then
 	echo "Restarting postgres"
 	systemctl restart postgresql
+	echo "Starting webserver"
+	systemctl start httpd
 else
 	/etc/init.d/postgresql restart
+	/etc/init.d/httpd restart
 fi
 if (( $NO_YUM == 0 ));
 then
@@ -61,6 +64,9 @@ fi
 echo "Adding a line to the IPTables to allow syslog information on UDP port 514..."
 iptables -D INPUT -p udp --dport 514 -j ACCEPT > /dev/null 2>&1
 iptables -I INPUT -p udp --dport 514 -j ACCEPT
+echo "Adding a line to the IPTables to allow http on TCP port 80..."
+iptables -D INPUT -p tcp --dport 80 -j ACCEPT > /dev/null 2>&1
+iptables -I INPUT -p tcp --dport 80 -j ACCEPT
 iptables-save > /dev/null 2>&1
 
 cd audiocodes_syslog_tool
