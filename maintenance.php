@@ -1,5 +1,6 @@
 <?php
-require "config.php";
+#require "config.php";
+parseIniFile();
 
 @$script = $argv[0];
 @$action = $argv[1];
@@ -9,9 +10,6 @@ if (!$action) stop();
 switch ($action) {
 case "tableRotate":
 	tableRotate();
-	break;
-case "vacuumCurrentTables":
-	vacuumCurrentTables();
 	break;
 case "deleteOptionRecords":
 	deleteOptionRecords();
@@ -29,7 +27,7 @@ default:
 function stop(){
 	global $script;
 
-	echo "Usage: php $script tableRotate|vacuumCurrentTables|deleteOptionRecords|initializeDatabase|generateRsyslogConfig\n\n";
+	echo "Usage: php $script tableRotate|deleteOptionRecords|initializeDatabase|generateRsyslogConfig\n\n";
 	exit;
 }
 
@@ -51,19 +49,8 @@ function tableRotate(){
 	}
 }
 
-function vacuumCurrentTables(){
-	global $devices_to_log;
-	global $dbhost, $dbname, $dbuser, $dbpass;
-	$db = pg_connect("host=$dbhost port=5432 dbname=$dbname user=$dbuser password=$dbpass") or die("error");
-
-	foreach ($devices_to_log as $name => $ip) {
-		$result = pg_query($db, "vacuum systemevents_$name");
-		echo "systemevents_$name vacuum complete.\n";
-	}
-}
-
 function deleteOptionRecords(){
-        global $devices_to_log;
+	global $devices_to_log;
 	global $dbhost, $dbname, $dbuser, $dbpass;
 	$db = pg_connect("host=$dbhost port=5432 dbname=$dbname user=$dbuser password=$dbpass") or die("error");
 
@@ -93,6 +80,8 @@ function deleteOptionRecords(){
 		echo "\n";
 		$result = pg_query($db, "vacuum systemevents_$name");
 	}
+
+	pg_close($db);
 }
 
 function generateRsyslogConfig(){
@@ -105,6 +94,10 @@ function generateRsyslogConfig(){
 	$data .= "\$UDPServerRun 514\n";
 	$data .= "\$ModLoad ompgsql\n";
 	$data .= "\$WorkDirectory /var/tmp\n";
+	$data .= "\$SystemLogRateLimitInterval 0\n";
+	$data .= "\$SystemLogRateLimitBurst 0\n";
+	$data .= "\$WorkDirectory /var/tmp\n";
+
 	$data .= "\$ActionQueueType LinkedList # use asynchronous processing\n";
 	$data .= "\$ActionQueueFileName dbq    # set file name, also enables disk mode\n";
 	$data .= "\$ActionResumeRetryCount -1   # infinite retries on insert failure\n";
@@ -159,7 +152,7 @@ function initializeDatabase(){
 		$result = @pg_query($query);
 		if (strpos(pg_last_error($db), "already exists")>0) echo "Table Systemevents_".$name."_cdr_formatted already exists...\n"; else echo "Table Systemevents_".$name."_cdr_formatted created.\n";
 
-$query= "CREATE FUNCTION insert_systemevents_$name"."_cdr_reformat() RETURNS trigger AS
+$query= "CREATE OR REPLACE FUNCTION insert_systemevents_$name"."_cdr_reformat() RETURNS trigger AS
 $$
 DECLARE
     a text[];
@@ -174,9 +167,12 @@ $$
   LANGUAGE 'plpgsql';";
 
 		$result = @pg_query($query);
-		if (strpos(pg_last_error($db), "already exists")>0) echo "Function insert_Systemevents_".$name."_cdr_formatted already exists...\n"; else echo "Function insert_Systemevents_".$name."_cdr_formatted created.\n";
+		if (strpos(pg_last_error($db), "already exists")>0) echo "Function insert_Systemevents_".$name."_cdr_formatted already exists...\n"; else echo "Function insert_Systemevents_".$name."_cdr_formatted created or replaced.\n";
 
+		$query = "DROP TRIGGER systemevents_$name"."_cdr_trigger ON systemevents_$name"."_cdr";
+		$result = @pg_query($query);
 		$query = "CREATE TRIGGER systemevents_$name"."_cdr_trigger AFTER INSERT ON systemevents_$name"."_cdr FOR EACH ROW EXECUTE PROCEDURE insert_systemevents_$name"."_cdr_reformat();";
+		echo $query."\n";
 		$result = @pg_query($query);
 		if (strpos(pg_last_error($db), "already exists")>0) echo "Trigger Systemevents_".$name."_cdr_trigger already exists...\n"; else echo "Trigger Systemevents_".$name."_cdr_trigger created.\n";
 
@@ -184,8 +180,40 @@ $$
 		$result = @pg_query($query);
 		if (strpos(pg_last_error($db), "already exists")>0) echo "Table SystemeventsProperties_$name already exists...\n"; else echo "Table SystemeventsProperties_$name created.\n";
 
-		$result = pg_query($db, "alter table systemevents_".$name." alter column id set default nextval('systemevents_".$name."_id_seq')"); //auto nextval doesn't come along..
+		#$result = pg_query($db, "alter table systemevents_".$name." alter column id set default nextval('systemevents_".$name."_id_seq')"); //auto nextval doesn't come along..
 		echo "\n";
 	}
+}
+
+function parseIniFile(){
+	$ini_array = parse_ini_file("settings.ini", true);
+
+	$GLOBALS["dbname"] = $ini_array["database"]["dbname"];
+	$GLOBALS["dbhost"] = $ini_array["database"]["dbhost"];
+	$GLOBALS["dbuser"] = $ini_array["database"]["dbuser"];
+	$GLOBALS["dbpass"] = $ini_array["database"]["dbpass"];
+
+	unset($ini_array["database"]);
+
+	$GLOBALS["related_devices|"] = array();
+
+	foreach($ini_array["related_devices"] as $device_name => $ip_address) {
+		$GLOBALS["related_devices"]["$device_name"] = "$ip_address";
+	}
+
+	unset($ini_array["related_devices"]);
+
+	$GLOBALS["devices_to_log"] = array();
+	$GLOBALS["devices_to_log_ip_interfaces"] = array();
+
+	foreach($ini_array as $sbc_device_name => $sbc_device){
+		$GLOBALS["devices_to_log"]["$sbc_device_name"] = $sbc_device["syslog_src_ip_address"];
+		unset($sbc_device["syslog_src_ip_address"]);
+		foreach($sbc_device as $ip_interface_name => $ip_interface_ip){
+			$GLOBALS["devices_to_log_ip_interfaces"]["$sbc_device_name"]["$ip_interface_name"] = "$ip_interface_ip";
+		}
+	}
+	#var_dump($GLOBALS["devices_to_log"]);
+	#var_dump($GLOBALS["devices_to_log_ip_interfaces"]);
 }
 ?>
