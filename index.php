@@ -434,17 +434,30 @@ async function updateScreen(classToHide) {
 			addRow(i);
 		}
 	} else {
-		// hiding divs..
-		var elements = document.getElementsByClassName(classToHide);
-		if (hidden_message_types.indexOf(classToHide) == -1) {
-			displayStyle = 'none';
-			hidden_message_types.push(classToHide);
+		if (classToHide !== "disableAll" && classToHide !== "enableAll" ) {
+			// hiding divs..
+			var elements = document.getElementsByClassName(classToHide);
+			console.log(hidden_message_types);
+			if (hidden_message_types.indexOf(classToHide) == -1) {
+				displayStyle = 'none';
+				hidden_message_types.push(classToHide);
+			} else {
+				displayStyle = 'block';
+				hidden_message_types.remove(classToHide);
+			}
+			for (var i = 0; i < elements.length; i++){
+				elements[i].style.display = displayStyle;
+			}
 		} else {
-			displayStyle = 'block';
-			hidden_message_types.remove(classToHide);
-		}
-		for (var i = 0; i < elements.length; i++){
-			elements[i].style.display = displayStyle;
+			if (classToHide === "disableAll") displayStyle = 'none';
+			else displayStyle = 'block';
+			console.log(message_types);
+			for (var item of message_types) {
+				var elements = document.getElementsByClassName(item);
+				for (var i = 0; i < elements.length; i++){
+					elements[i].style.display = displayStyle;
+				}
+			}
 		}
 	}
 }
@@ -464,7 +477,8 @@ function setAllMessageTypes(value) {
         for (var item of message_types) {
                 document.getElementById(item).checked = value;
         }
-	updateScreen(value);
+	if (value === false) updateScreen("disableAll");
+	else updateScreen("enableAll");
 }
 
 async function drawSip() {
@@ -845,10 +859,14 @@ async function processMessageTypes() {
 			await addToMessageTypes(item);
 		}
 
-		div.innerHTML += "Select types of messages to log:";
+		div.innerHTML += "Select types of messages to display:";
 		for (var item of message_types) {
 			if (item === "") item = "-null-";
-			div.innerHTML += "<input type='checkbox' id='"+item+"' onchange='updateScreen(\""+item+"\")'checked />"+item+" | ";
+			if (item === "-null-") {
+				div.innerHTML += "<input type='checkbox' id='"+item+"' onchange='updateScreen(\""+item+"\")'checked />SIP | ";
+			} else {
+				div.innerHTML += "<input type='checkbox' id='"+item+"' onchange='updateScreen(\""+item+"\")'checked />"+item+" | ";
+			}
 		}
 		div.innerHTML += "<input type='button' onclick='setAllMessageTypes(false)' value='Disable all'/>";
 		div.innerHTML += " | <input type='button' onclick='setAllMessageTypes(true)' value='Enable all'/>";

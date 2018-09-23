@@ -86,7 +86,7 @@ function deleteOptionRecords(){
 
 function generateRsyslogConfig(){
         global $devices_to_log;
-	$filename = "00_audiocodes.conf";
+	$filename = "/etc/rsyslog.d/00_audiocodes.conf";
 
 	if (file_exists($filename)) unlink($filename);
 
@@ -94,12 +94,12 @@ function generateRsyslogConfig(){
 	$data .= "\$UDPServerRun 514\n";
 	$data .= "\$ModLoad ompgsql\n";
 	$data .= "\$WorkDirectory /var/tmp\n";
-	$data .= "\$SystemLogRateLimitInterval 0\n";
-	$data .= "\$SystemLogRateLimitBurst 0\n";
+	#$data .= "\$SystemLogRateLimitInterval 0\n";
+	#$data .= "\$SystemLogRateLimitBurst 0\n";
 	$data .= "\$WorkDirectory /var/tmp\n";
 
 	$data .= "\$ActionQueueType LinkedList # use asynchronous processing\n";
-	$data .= "\$ActionQueueFileName dbq    # set file name, also enables disk mode\n";
+	#$data .= "\$ActionQueueFileName dbq    # set file name, also enables disk mode\n";
 	$data .= "\$ActionResumeRetryCount -1   # infinite retries on insert failure\n";
 
 	foreach ($devices_to_log as $name => $ip) {
@@ -111,6 +111,10 @@ function generateRsyslogConfig(){
 		$data.="& ~\n";
 	}
 	file_put_contents($filename, $data);
+
+	echo "Config written, restarting Rsyslog..\n";
+
+	exec ("/etc/init.d/rsyslog restart");
 }
 
 function initializeDatabase(){
