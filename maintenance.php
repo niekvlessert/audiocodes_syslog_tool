@@ -1,5 +1,8 @@
+#!/usr/bin/php
 <?php
 #require "config.php";
+date_default_timezone_set(@date_default_timezone_get());
+
 parseIniFile();
 
 @$script = $argv[0];
@@ -7,18 +10,27 @@ parseIniFile();
 
 if (!$action) stop();
 
+$today = date("_m_d");
+$yesterday = date("_m_d",strtotime("-1 days"));
+$tomorrow = date("_m_d",strtotime("tomorrow"));
+
 switch ($action) {
 case "tableRotate":
 	tableRotate();
 	break;
-case "deleteOptionRecords":
-	deleteOptionRecords();
+case "createDbTomorrow":
+	initializeDatabase($tomorrow);
+case "deleteOptionsRecords":
+	deleteOptionsRecords($today);
 	break;
 case "initializeDatabase":
-	initializeDatabase();
+	initializeDatabase($today);
 	break;
 case "generateRsyslogConfig":
 	generateRsyslogConfig();
+	break;
+case "install":
+	install();
 	break;
 default:
 	stop();
@@ -27,11 +39,56 @@ default:
 function stop(){
 	global $script;
 
-	echo "Usage: php $script tableRotate|deleteOptionRecords|initializeDatabase|generateRsyslogConfig\n\n";
+	echo "Usage: php $script install|tableRotate|deleteOptionRecords|initializeDatabase|generateRsyslogConfig\n\n";
 	exit;
 }
 
-function tableRotate(){
+function install(){
+	global $today;
+
+	exec("pwd", $output);
+	if ($output[0]!="/opt/ast") {
+		echo "Installing...\n";
+		exec ("mkdir -p /opt/ast");
+		exec ("cp maintenance.php /opt/ast/ast_maintenance");
+		exec ("chmod +x /opt/ast/ast_maintenance");
+		exec ("cp settings.ini /opt/ast/");
+
+		exec ("mkdir -p /var/www/html/ast");
+		exec ("cp index.php /var/www/html/ast/");
+		echo "Done... now go to /opt/ast and edit settings.ini... when done run ./ast_maintenance install\n";
+	} else {
+		generateRsyslogConfig();
+		initializeDatabase($today);
+		generateConfigPhp();
+		generateCronEntries();
+
+		echo "\nAudiocodes Syslog Tool is installed now... configure your SBC to log to ...TODO \n";
+	}
+}
+
+function generateConfigPhp(){
+	global $devices_to_log, $devices_to_log_ip_interfaces, $related_devices;
+	global $dbhost, $dbname, $dbuser, $dbpass;
+
+	$filename="config.php";
+
+	file_put_contents($filename, "<?php\n");
+	file_put_contents($filename, '$dbhost = ' . var_export($dbhost, true) . ";\n",FILE_APPEND);
+	file_put_contents($filename, '$dbname = ' . var_export($dbname, true) . ";\n",FILE_APPEND);
+	file_put_contents($filename, '$dbuser = ' . var_export($dbuser, true) . ";\n",FILE_APPEND);
+	file_put_contents($filename, '$dbpass = ' . var_export($dbpass, true) . ";\n",FILE_APPEND);
+	file_put_contents($filename, '$devices_to_log = ' . var_export($devices_to_log, true) . ";\n",FILE_APPEND);
+	file_put_contents($filename, '$devices_to_log_ip_interfaces = ' . var_export($devices_to_log_ip_interfaces, true) . ";\n",FILE_APPEND);
+	file_put_contents($filename, '$none_sbc_devices = ' . var_export($related_devices, true) . ";\n",FILE_APPEND);
+	file_put_contents($filename, "?>\n",FILE_APPEND);
+
+	exec ("cp config.php /var/www/html/ast/");
+
+	echo "config.php created...\n";
+}
+
+/*function tableRotate(){
 	global $devices_to_log;
 	global $dbhost, $dbname, $dbuser, $dbpass;
 	$date = date("Ymd",strtotime("-1 days"));
@@ -47,14 +104,20 @@ function tableRotate(){
 		$result = pg_query($db, "alter table systemevents_".$name." alter column id set default nextval('systemevents_".$name."_id_seq')"); //auto nextval doesn't come along..
 		echo "systemevents_$name rotated.\n";
 	}
-}
+}*/
 
-function deleteOptionRecords(){
+function deleteOptionsRecords($date){
 	global $devices_to_log;
 	global $dbhost, $dbname, $dbuser, $dbpass;
 	$db = pg_connect("host=$dbhost port=5432 dbname=$dbname user=$dbuser password=$dbpass") or die("error");
 
 	foreach ($devices_to_log as $name => $ip) {
+		$name.=$date;
+		$query="delete from systemevents_$name where SID in (select sid from systemevents_$name where optionsdetected=true)";
+		$result = pg_query($db, $query);
+	}
+
+	/*
 		$result = pg_query($db, "vacuum systemevents_$name");
 		#$query=pg_escape_string("select substring(main.message from E'\\[[^]]*\\]') as number from systemevents_$name main, systemevents_$name secondary WHERE substring(main.message from 3 for 20) = substring(secondary.message from 3 for 20) AND secondary.message LIKE '%OPTIONS sip%'");
 		#$result = pg_prepare($db, "my_query", "select substring(main.message from $1) as number from systemevents_$name main, systemevents_$name secondary WHERE substring(main.message from 3 for 20) = substring(secondary.message from 3 for 20) AND secondary.message LIKE '%OPTIONS sip%'");
@@ -79,21 +142,21 @@ function deleteOptionRecords(){
 		}
 		echo "\n";
 		$result = pg_query($db, "vacuum systemevents_$name");
-	}
+	}*/
 
 	pg_close($db);
 }
 
 function generateRsyslogConfig(){
         global $devices_to_log;
-	$filename = "/etc/rsyslog.d/00_audiocodes.conf";
+
+	$filename = "00_audiocodes.conf";
 
 	if (file_exists($filename)) unlink($filename);
 
 	$data = "\$ModLoad imudp\n";
 	$data .= "\$UDPServerRun 514\n";
 	$data .= "\$ModLoad ompgsql\n";
-	$data .= "\$WorkDirectory /var/tmp\n";
 	#$data .= "\$SystemLogRateLimitInterval 0\n";
 	#$data .= "\$SystemLogRateLimitBurst 0\n";
 	$data .= "\$WorkDirectory /var/tmp\n";
@@ -101,10 +164,9 @@ function generateRsyslogConfig(){
 	$data .= "\$ActionQueueType LinkedList # use asynchronous processing\n";
 	#$data .= "\$ActionQueueFileName dbq    # set file name, also enables disk mode\n";
 	$data .= "\$ActionResumeRetryCount -1   # infinite retries on insert failure\n";
-
 	foreach ($devices_to_log as $name => $ip) {
-		$data.="\$template $name"."_cdr,\"insert into SystemEvents_$name"."_cdr (Message, Facility, FromHost, Priority, DeviceReportedTime, ReceivedAt, InfoUnitID, SysLogTag) values ('%msg%', %syslogfacility%, '%HOSTNAME%', %syslogpriority%, '%timereported:::date-pgsql%', '%timegenerated:::date-pgsql%', %iut%, '%syslogtag%')\",STDSQL\n";
-		$data.="\$template $name,\"insert into SystemEvents_$name (Message, Facility, FromHost, Priority, DeviceReportedTime, ReceivedAt, InfoUnitID, SysLogTag) values ('%msg%', %syslogfacility%, '%HOSTNAME%', %syslogpriority%, '%timereported:::date-pgsql%', '%timegenerated:::date-pgsql%', %iut%, '%syslogtag%')\",STDSQL\n";
+		$data.="\$template $name"."_cdr,\"insert into SystemEvents_$name"."_%\$MONTH%_%\$DAY%_cdr (Message, Facility, FromHost, Priority, DeviceReportedTime, ReceivedAt, InfoUnitID, SysLogTag) values ('%msg%', %syslogfacility%, '%HOSTNAME%', %syslogpriority%, '%timereported:::date-pgsql%', '%timegenerated:::date-pgsql%', %iut%, '%syslogtag%')\",STDSQL\n";
+		$data.="\$template $name,\"insert into SystemEvents_$name"."_%\$MONTH%_%\$DAY% (SID, Message, OptionsDetected, Facility, FromHost, Priority, DeviceReportedTime, ReceivedAt, InfoUnitID, SysLogTag) values (regexp_matches('%msg%', E'SID=(.*)\\\]'), '%msg%', '%msg%' ~ 'OPTIONS sip:', %syslogfacility%, '%HOSTNAME%', %syslogpriority%, '%timereported:::date-pgsql%', '%timegenerated:::date-pgsql%', %iut%, '%syslogtag%')\",STDSQL\n";
 		$data.="if \$fromhost-ip startswith '$ip' and \$syslogfacility-text == 'local1' then :ompgsql:127.0.0.1,syslog,syslog,syslog;$name"."_cdr\n";
 		$data.="& ~\n";
 		$data.="if \$fromhost-ip startswith '$ip' then :ompgsql:127.0.0.1,syslog,syslog,syslog;$name\n";
@@ -112,40 +174,61 @@ function generateRsyslogConfig(){
 	}
 	file_put_contents($filename, $data);
 
+	exec("cp $filename /etc/rsyslog.d/");
+
 	echo "Config written, restarting Rsyslog..\n";
 
 	exec ("/etc/init.d/rsyslog restart");
 }
 
-function initializeDatabase(){
+function generateCronEntries(){
+	$filename = "cron_ast";
+
+	file_put_contents($filename, "0 23 * * * root /opt/ast/ast_maintenance createDbTomorrow");
+	file_put_contents($filename, "0 1 * * * root /opt/ast/ast_maintenance deleteOptionsRecords");
+
+	exec ("cp $filename /etc/cron.d");
+
+	echo "\ncron configuration created...\n";
+}
+
+function initializeDatabase($date){
 	global $devices_to_log;
+	global $today;
 	global $dbhost, $dbname, $dbuser, $dbpass;
 
-	// create the default things as user postgres, then swap to default role
+	if ($date == $today) {
+		// create the default things as user postgres, then swap to default role
+		$db = pg_connect("host=$dbhost port=5432 user=postgres password=") or die("error");
+		// create role syslog if it doesn't exist already
+		// create database Syslog as user postgres and change owner to syslog if it doesn't exist already
 
-	$db = pg_connect("host=$dbhost port=5432 user=postgres password=") or die("error");
+		$result = @pg_query("create database $dbname");
+		if (strpos(pg_last_error($db), "already exists")>0) echo "Primary database $dbname already exists...\n";
+		$result = @pg_query("create role $dbuser with login encrypted password '$dbpass';");
+		if (strpos(pg_last_error($db), "already exists")>0) echo "Primary role $dbuser already exists...\n";
+		$result = @pg_query("alter database $dbname owner to $dbuser");
 
-	// create role syslog if it doesn't exist already
-	// create database Syslog as user postgres and change owner to syslog if it doesn't exist already
+		$result = @pg_query("create LANGUAGE plpgsql;");
 
-	$result = @pg_query("create database $dbname");
-	if (strpos(pg_last_error($db), "already exists")>0) echo "Primary database $dbname already exists...\n";
-	$result = @pg_query("create role $dbuser with login encrypted password '$dbpass';");
-	if (strpos(pg_last_error($db), "already exists")>0) echo "Primary role $dbuser already exists...\n";
-	$result = @pg_query("alter database $dbname owner to $dbuser");
-
-	$result = @pg_query("create LANGUAGE plpgsql;");
-
-	pg_close($db);
+		pg_close($db);
+	}
 	
 	$db = pg_connect("host=$dbhost port=5432 dbname=$dbname user=$dbuser password=$dbpass") or die("error");
 
 	echo "\n";
 
 	foreach ($devices_to_log as $name => $device) {
-		$query="CREATE TABLE SystemEvents_$name ( ID serial not null primary key, CustomerID bigint, ReceivedAt timestamp without time zone NULL, DeviceReportedTime timestamp without time zone NULL, Facility smallint NULL, Priority smallint NULL, FromHost varchar(60) NULL, Message text, NTSeverity int NULL, Importance int NULL, EventSource varchar(60), EventUser varchar(60) NULL, EventCategory int NULL, EventID int NULL, EventBinaryData text NULL, MaxAvailable int NULL, CurrUsage int NULL, MinUsage int NULL, MaxUsage int NULL, InfoUnitID int NULL , SysLogTag varchar(60), EventLogType varchar(60), GenericFileName VarChar(60), SystemID int NULL );";
+		$name.=$date;
+
+		$query="CREATE TABLE SystemEvents_$name ( ID serial not null primary key, CustomerID bigint, ReceivedAt timestamp without time zone NULL, DeviceReportedTime timestamp without time zone NULL, Facility smallint NULL, Priority smallint NULL, FromHost varchar(60) NULL, SID varchar(30), Message text, OptionsDetected boolean, NTSeverity int NULL, Importance int NULL, EventSource varchar(60), EventUser varchar(60) NULL, EventCategory int NULL, EventID int NULL, EventBinaryData text NULL, MaxAvailable int NULL, CurrUsage int NULL, MinUsage int NULL, MaxUsage int NULL, InfoUnitID int NULL , SysLogTag varchar(60), EventLogType varchar(60), GenericFileName VarChar(60), SystemID int NULL );";
+		//echo $query."\n";
 		$result = @pg_query($query);
 		if (strpos(pg_last_error($db), "already exists")>0) echo "Table Systemevents_$name already exists...\n"; else echo "Table Systemevents_$name created.\n";
+
+		$query="CREATE INDEX systemevents_$name"."_sid_index ON SystemEvents_$name ( sid);";
+		$result = @pg_query($query);
+		if (strpos(pg_last_error($db), "already exists")>0) echo "Index on SID in Systemevents_$name already exists...\n"; else echo "Index on SID on Systemevents_$name created.\n";
 
 		$query="CREATE TABLE SystemEvents_".$name."_cdr ( ID serial not null primary key, CustomerID bigint, ReceivedAt timestamp without time zone NULL, DeviceReportedTime timestamp without time zone NULL, Facility smallint NULL, Priority smallint NULL, FromHost varchar(60) NULL, Message text, NTSeverity int NULL, Importance int NULL, EventSource varchar(60), EventUser varchar(60) NULL, EventCategory int NULL, EventID int NULL, EventBinaryData text NULL, MaxAvailable int NULL, CurrUsage int NULL, MinUsage int NULL, MaxUsage int NULL, InfoUnitID int NULL , SysLogTag varchar(60), EventLogType varchar(60), GenericFileName VarChar(60), SystemID int NULL );";
 		$result = @pg_query($query);
@@ -155,6 +238,10 @@ function initializeDatabase(){
 		$query= "CREATE TABLE systemevents_$name"."_cdr_formatted( id SERIAL PRIMARY KEY, SBCReportType VARCHAR, EPTyp VARCHAR, SIPCallId VARCHAR, SessionId VARCHAR, Orig VARCHAR, SourceIp VARCHAR, SourcePort VARCHAR, DestIp VARCHAR, DestPort VARCHAR, TransportType VARCHAR, SrcURI VARCHAR, SrcURIBeforeMap VARCHAR, DstURI VARCHAR, DstURIBeforeMap VARCHAR, Durat VARCHAR, TrmSd VARCHAR, TrmReason VARCHAR, TrmReasonCategory VARCHAR, SetupTime VARCHAR, ConnectTime VARCHAR, ReleaseTime VARCHAR, RedirectReason VARCHAR, RedirectUR VARCHAR, INum VARCHAR, RedirectURINumBeforeMap VARCHAR, TxSigIPDiffServ VARCHAR, IPGroup VARCHAR, SrdId VARCHAR, SIPInterfaceId VARCHAR, ProxySetId VARCHAR, IpProfileId VARCHAR, MediaRealmId VARCHAR, DirectMedia VARCHAR, SIPTrmReason VARCHAR, SIPTermDesc VARCHAR, Caller VARCHAR, Callee VARCHAR, Trigger VARCHAR, LegId VARCHAR);";
 		$result = @pg_query($query);
 		if (strpos(pg_last_error($db), "already exists")>0) echo "Table Systemevents_".$name."_cdr_formatted already exists...\n"; else echo "Table Systemevents_".$name."_cdr_formatted created.\n";
+
+		$query="CREATE INDEX systemevents_$name"."_cdr_formatted_to_index ON SystemEvents_$name ( sid);";
+		$result = @pg_query($query);
+		if (strpos(pg_last_error($db), "already exists")>0) echo "Index on SID in Systemevents_$name already exists...\n"; else echo "Index on SID on Systemevents_$name created.\n";
 
 $query= "CREATE OR REPLACE FUNCTION insert_systemevents_$name"."_cdr_reformat() RETURNS trigger AS
 $$
@@ -176,7 +263,7 @@ $$
 		$query = "DROP TRIGGER systemevents_$name"."_cdr_trigger ON systemevents_$name"."_cdr";
 		$result = @pg_query($query);
 		$query = "CREATE TRIGGER systemevents_$name"."_cdr_trigger AFTER INSERT ON systemevents_$name"."_cdr FOR EACH ROW EXECUTE PROCEDURE insert_systemevents_$name"."_cdr_reformat();";
-		echo $query."\n";
+		//echo $query."\n";
 		$result = @pg_query($query);
 		if (strpos(pg_last_error($db), "already exists")>0) echo "Trigger Systemevents_".$name."_cdr_trigger already exists...\n"; else echo "Trigger Systemevents_".$name."_cdr_trigger created.\n";
 

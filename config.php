@@ -1,1 +1,0 @@
-/var/www/html/config.php
