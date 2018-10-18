@@ -185,7 +185,8 @@ if (strlen($number)>0 || $sid) {
 
 
 	if ($latest_call_only) $query = "select main.message, main.devicereportedtime, main.fromhost, main.id FROM systemevents_$device main WHERE substring(main.message from 3 for $sid_length) = (select substring(secondary.message from 3 for $sid_length) from systemevents_$device secondary where secondary.message LIKE '%INVITE sip:%$number%' order by id desc limit 1);";
-	if ($sid) $query = "select main.message, main.devicereportedtime, main.fromhost, main.id FROM systemevents_$device"."$date main WHERE sid = '\{$sid\}' order by main.id;";
+	//if ($sid) $query = "select main.message, main.devicereportedtime, main.fromhost, main.id FROM systemevents_$device"."$date main WHERE sid = '\{$sid\}' order by main.id;"; // Does work in another test environment, not sure why it doesn't now...
+	if ($sid) $query = "select main.message, main.devicereportedtime, main.fromhost, main.id FROM systemevents_$device"."$date main WHERE sid like '%$sid%' order by main.id;";
 	if (!$query) $query = "select distinct on (sessionid) dsturibeforemap, sessionid, setuptime, id from systemevents_$device"."$date"."_cdr_formatted where dsturibeforemap like '%$number%' or srcuri like '%$number%' or dsturi like '%$number%' order by sessionid desc limit 20";
 
 /*
@@ -202,6 +203,7 @@ if (strlen($number)>0 || $sid) {
 
 	echo "console.log(\"$query\");\n";
         $result = pg_query($db, $query);
+	 echo "console.log(\"".pg_last_error($db)."\");\n";
 
         $sid_logged = false;
 	$dont_log = false;
@@ -226,6 +228,7 @@ if (strlen($number)>0 || $sid) {
 			echo "none_sbc_device_data_bundle.push(device_data);\n";
 		}
 
+		echo "console.log('".pg_num_rows($result)."');\n";
 		while($row = pg_fetch_assoc($result)) {
 			$messages_splitted = array();
 			if (!$sid_logged) {
@@ -234,7 +237,7 @@ if (strlen($number)>0 || $sid) {
 				$sid_logged = true;
 			}
 			$message = substr($row['message'], strpos($row['message'], "]")+1);
-			$message = substr($message, strpos($message, "]")+3);
+			$message = substr($message, strpos($message, "]")+2); //this +2 might differ depending on (I guess) firmware version
 			$message = str_replace("#012(", "#012((", $message);
 			$messages = explode("#012(", $message);
 			foreach ($messages as $key => $message) {
@@ -495,8 +498,6 @@ async function drawSip() {
 	var sip_message = {};
 	sip_message.direction = "";
 	callog.forEach(function(item) {
-		//console.log("item.message");
-		//console.log(item.message);
 		if (item.messagetype === "-null-") {
 			if (sip_message_found) {
 				sip_message.message += item.message;

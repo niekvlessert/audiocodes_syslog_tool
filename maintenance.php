@@ -63,7 +63,9 @@ function install(){
 		generateConfigPhp();
 		generateCronEntries();
 
-		echo "\nAudiocodes Syslog Tool is installed now... configure your SBC to log to ...TODO \n";
+		echo "\nAudiocodes Syslog Tool is installed now... configure your SBC to log to the IP address of the server and visit the server using Chrome or Firefox. The tool is in /ast/\n";
+		echo "In the GUI go to Troubleshoot/Logging/Syslog Settings\n";
+		echo "Enable Syslog, Syslog CPU protection, Syslog Optimization, set Debug Level to Detailed and set the Syslog Server IP\n";
 	}
 }
 
@@ -178,14 +180,15 @@ function generateRsyslogConfig(){
 
 	echo "Config written, restarting Rsyslog..\n";
 
-	exec ("/etc/init.d/rsyslog restart");
+	exec ("/etc/init.d/rsyslog restart 2> /dev/null ||systemctl restart rsyslog");
 }
 
 function generateCronEntries(){
 	$filename = "cron_ast";
 
-	file_put_contents($filename, "0 23 * * * root /opt/ast/ast_maintenance createDbTomorrow");
-	file_put_contents($filename, "0 1 * * * root /opt/ast/ast_maintenance deleteOptionsRecords");
+	$data="0 23 * * * root /opt/ast/ast_maintenance createDbTomorrow\n";
+	$data.="0 1 * * * root /opt/ast/ast_maintenance deleteOptionsRecords\n";
+	file_put_contents($filename, $data);
 
 	exec ("cp $filename /etc/cron.d");
 

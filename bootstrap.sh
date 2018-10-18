@@ -44,6 +44,7 @@ sed -i 's/short_open_tag = Off/short_open_tag = On/g' /etc/php.ini
 echo "Allow postgres connections more loosely..."
 sed -i "s/\#listen_addresses = 'localhost'*/listen_addresses = '\*'        /g" /var/lib/pgsql/data/postgresql.conf
 sed -i 's/host    all             all             127.0.0.1\/32            ident/host    all             all             127.0.0.1\/32            trust/g' /var/lib/pgsql/data/pg_hba.conf
+sed -i 's/local   all             all                                     ident/local   all             all                                     trust/g' /var/lib/pgsql/data/pg_hba.conf
 
 RESULT=$(which systemctl > /dev/null 2>&1)
 if (( $? == 0 ));
@@ -68,6 +69,9 @@ echo "Adding a line to the IPTables to allow http on TCP port 80..."
 iptables -D INPUT -p tcp --dport 80 -j ACCEPT > /dev/null 2>&1
 iptables -I INPUT -p tcp --dport 80 -j ACCEPT
 iptables-save > /dev/null 2>&1
+echo "Disabling SELinux..."
+setenforce 0
+sed -i "s/SELINUXTYPE=targeted/SELINUXTYPE=disabled/g" /etc/selinux/config
 
 cd audiocodes_syslog_tool
 php maintenance.php install
