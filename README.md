@@ -32,17 +32,21 @@ After that you must use the maintanance script that can take care of several tas
 - Create the database tables for tomorrow
 - Generate a cron file
 
-But before using it edit the settings.ini and when done run:
+But before using it edit the settings.ini; then:
 
 ```
 ./ast_maintenance install
 ```
 
-When done you must set the Audiocodes device to log syslog data to the IP address of your machine. You can then have a look in the database because data should be appearing:
+When done visit your webserver using Chrome/Firefox, the folder is /ast/.
+
+Obviously you must set the Audiocodes device to log syslog data to the IP address of your Syslog machine. You can then try the GUI after some calls have been made through the device, or have a look in the database if it's not working:
+
 ```
 psql -U syslog
 select * from systemevents_<devicename>_<month>_<day>;
 ```
+
 Be careful; every day for every SBC logging needs a few tables. If your system doesn't have them Rsyslog will fill the database log files very quickly. They cronjob in /etc/cron.d/cron_ast takes care of this.
 
 Todo
