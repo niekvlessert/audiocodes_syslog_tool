@@ -185,7 +185,6 @@ if (strlen($number)>0 || $sid) {
 
 
 	if ($latest_call_only) $query = "select main.message, main.devicereportedtime, main.fromhost, main.id FROM systemevents_$device main WHERE substring(main.message from 3 for $sid_length) = (select substring(secondary.message from 3 for $sid_length) from systemevents_$device secondary where secondary.message LIKE '%INVITE sip:%$number%' order by id desc limit 1);";
-	//if ($sid) $query = "select main.message, main.devicereportedtime, main.fromhost, main.id FROM systemevents_$device"."$date main WHERE sid = '\{$sid\}' order by main.id;"; // Does work in another test environment, not sure why it doesn't now...
 	if ($sid) $query = "select main.message, main.devicereportedtime, main.fromhost, main.id FROM systemevents_$device"."$date main WHERE sid like '%$sid%' order by main.id;";
 	if (!$query) $query = "select distinct on (sessionid) dsturibeforemap, sessionid, setuptime, id from systemevents_$device"."$date"."_cdr_formatted where dsturibeforemap like '%$number%' or srcuri like '%$number%' or dsturi like '%$number%' order by sessionid desc limit 20";
 
@@ -208,8 +207,11 @@ if (strlen($number)>0 || $sid) {
         $sid_logged = false;
 	$dont_log = false;
 	$previous_message_type = "";
+	$a=0;
 
 	if ($latest_call_only || $sid) {
+		$sbc_sip_interface_ip = "";
+
 		if ($devices_to_log[$device]) {
 			$device_ip = $devices_to_log[$device];
 			echo "device_name = '$device';\n";
@@ -228,7 +230,7 @@ if (strlen($number)>0 || $sid) {
 			echo "none_sbc_device_data_bundle.push(device_data);\n";
 		}
 
-		echo "console.log('".pg_num_rows($result)."');\n";
+		//echo "console.log('".pg_num_rows($result)."');\n";
 		while($row = pg_fetch_assoc($result)) {
 			$messages_splitted = array();
 			if (!$sid_logged) {
@@ -250,10 +252,11 @@ if (strlen($number)>0 || $sid) {
 					//echo "en: ". substr($message,$pos+9)."\n";
 					//echo "----------------------------------------------------------------------------------------------\n";
 				} else {
-					//echo "$message\n";
+					//echo"console.log('$message');\n";
 					array_push($messages_splitted, $message);
 				}
 			}
+
 
 			//print_r($messages_splitted);
 			foreach ($messages_splitted as $message_splitted) {
@@ -273,6 +276,7 @@ if (strlen($number)>0 || $sid) {
 
 				if (preg_match('/\((.*?)\)/',substr($message,0,100), $message_id)) {
 					$message = substr($message, strpos($message, ")")+1);
+					//echo"console.log('$message');\n";
 				} else {
 					$message_id[1]="";
 					//echo"console.log('$message');\n";
@@ -280,6 +284,7 @@ if (strlen($number)>0 || $sid) {
 				if ($previous_message_type == "-null-" && $message_type[1] == "-null-") {
 					echo "var siddata = callog.pop();\n";
 					echo "siddata.message += \"".trim(addslashes($message))."\";\n";
+					//echo"console.log('$message');\n";
 				} else {
 					echo "var siddata = {};\n";
 					echo "siddata.devicereportedtime = \"".$row['devicereportedtime']."\";\n";
@@ -288,6 +293,18 @@ if (strlen($number)>0 || $sid) {
 					echo "siddata.messageid = \"".trim($message_id[1])."\";\n";
 					//echo "siddata.message = \"".trim(addslashes($row['message']))."\";\n";
 					echo "siddata.message = \"".trim(addslashes($message))."\";\n";
+					if ($sbc_sip_interface_ip == "") {
+						if (strpos($message,"Incoming SIP Message from")!=0) {
+							preg_match('/(\()(.*?)(\))/',$message, $resultt);
+							foreach ($devices_to_log_ip_interfaces[$device] as $interface_name => $ip) {
+								if ($resultt[2] == $interface_name) {
+									$sbc_sip_interface_ip = $ip;
+									echo "sbc_ip_used = '$ip';\n";
+									//echo "console.log(sbc_ip_used);\n";
+								}
+							}
+						}
+					}
 				}
 				echo "callog.push(siddata);\n";
 
@@ -512,8 +529,8 @@ async function drawSip() {
 				//console.log(split_action);
 				switch (split_action[0]) { 
 				case "INVITE":
-					console.log("--------- INVITE------------ ");
-					console.log(split_action);
+					//console.log("--------- INVITE------------ ");
+					//console.log(split_action);
 					if (!sip_message.dst) {
 						if (split_action[1].lastIndexOf(";") !== -1) {
 							sip_message.dst = split_action[1].substring(split_action[1].lastIndexOf("@")+1, split_action[1].lastIndexOf(";"));
@@ -525,7 +542,7 @@ async function drawSip() {
 					if (split_action[1].lastIndexOf("@") !== -1) sip_message.dst_number = split_action[1].substring(split_action[1].indexOf(":")+1, split_action[1].indexOf("@"));
 					else sip_message.dst_number = "";
 					if (sip_message.dst.indexOf(":") !== -1) sip_message.dst = sip_message.dst.slice(0,sip_message.dst.indexOf(":"));
-					console.log("INVITE detected to " + sip_message.dst + " to number " + sip_message.dst_number);
+					//console.log("INVITE detected to " + sip_message.dst + " to number " + sip_message.dst_number);
 					//console.log(split_message);
 					for (var i = 0; i < split_message.length; i++) {
 						if (split_message[i].indexOf('User-Agent')>-1) sip_message.user_agent = split_message[i].substring(split_message[i].indexOf(":")).slice(2,-1);
@@ -653,7 +670,10 @@ async function drawSip() {
 				vertical_line2.ip_address = device_ip;
 				vertical_line2.device_name = device_name.toUpperCase();
 			}*/
-			vertical_line2.ip_address = sip_dialog_information[i].dst;
+
+			//vertical_line2.ip_address = sip_dialog_information[i].dst;
+			vertical_line2.ip_address = sbc_ip_used; // ip fetched from config file, request uri can't be trusted..
+
 			vertical_line2.device_name = device_name.toUpperCase();
 
 			vertical_line2.horizontal_position = horizontal_position;

@@ -57,7 +57,6 @@ Todo
 - More information about calls after initial search
 - Make the calls clickable only when there's call data available
 - Sometimes the database trigger goes wrong, somehow the number of fields differs
-- The settings.ini contains SIP interface information settings. Those are not used yet. This will result in wrong IP addresses in the SIP dialog and might corrupt the dialog sometimes
 - Display SBC errors/warnings detected in a nice searcheable way
 - Add a bash completion file to be able to use tab to find correct paramaters of ast_maintenance
 - Probably some (a lot?) of SIP scenarios will be parsed wrong, fix it whenever that occurs...
