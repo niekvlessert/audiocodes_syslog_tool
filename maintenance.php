@@ -39,7 +39,7 @@ default:
 function stop(){
 	global $script;
 
-	echo "Usage: php $script install|tableRotate|deleteOptionsRecords|initializeDatabase|generateRsyslogConfig\n\n";
+	echo "Usage: php $script install|tableRotate|deleteOptionsRecords|initializeDatabase|createDbTomorrow|generateRsyslogConfig\n\n";
 	exit;
 }
 
