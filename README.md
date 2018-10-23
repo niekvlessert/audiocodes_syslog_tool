@@ -1,4 +1,4 @@
-# Audiocodes Syslog Viewer Tool by Niek Vlessert
+# Audiocodes Syslog Viewer Tool
 
 Licensed under the GPL v3
 
@@ -47,7 +47,7 @@ psql -U syslog
 select * from systemevents_<devicename>_<month>_<day>;
 ```
 
-Be careful; every day for every SBC logging needs a few tables. If your system doesn't have them Rsyslog will fill the database log files very quickly. They cronjob in /etc/cron.d/cron_ast takes care of this.
+Be careful; every day for every SBC logging needs a few tables. If your system doesn't have them Rsyslog will fill the database log files very quickly. They cronjob in /etc/cron.d/cron_ast takes care of this. You may run ast_maintenance without command line options to see the possibilitiet. Run with initializeDatabase to create the tables for today, use createDbTomorrow for the tables for tomorrow.
 
 Todo
 
