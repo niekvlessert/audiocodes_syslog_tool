@@ -419,7 +419,7 @@ function addRow(i) {
                 }
                 break;
         default:
-                div.innerHTML = "<b>"+callog[i].messagetype+"</b> - ";
+                if (callog[i].messagetype !== "other") div.innerHTML = "<b>"+callog[i].messagetype+"</b> - ";
                 message = message.replace('[ManSet','ManSet');
                 message = message.replace(/\[(.*?)\]/g,"");
 		div.innerHTML += message;
