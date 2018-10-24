@@ -159,7 +159,7 @@ function checkCombinations(e){
 <?
 
 if (strlen($number)>0 || $sid) {
-	echo "number = \"$number\"\n";
+	echo "number = \"$number\";\n";
 	//echo "sid = \"$sid\"\n";
 	$latest_call_only = false;
 	if (@$_GET['last_one_only'] == "on") {
@@ -181,10 +181,9 @@ if (strlen($number)>0 || $sid) {
 	//echo "console.log('".$result[0]."');\n";
 	preg_match_all('/\[SID=(.*?)\]/i', $result[0], $sid_data);
 	$sid_length = strlen($sid_data[1][0]);
-	echo "console.log('$sid_length');\n";
+	//echo "console.log('found sid length: $sid_length');\n";
 
-
-	if ($latest_call_only) $query = "select main.message, main.devicereportedtime, main.fromhost, main.id FROM systemevents_$device main WHERE substring(main.message from 3 for $sid_length) = (select substring(secondary.message from 3 for $sid_length) from systemevents_$device secondary where secondary.message LIKE '%INVITE sip:%$number%' order by id desc limit 1);";
+	if ($latest_call_only) $query = "select main.message, main.devicereportedtime, main.fromhost, main.id FROM systemevents_$device"."$date main WHERE main.sid = (select '{' || trim(secondary.sessionid::text) || '}' from systemevents_$device"."$date"."_cdr_formatted secondary where secondary.dsturibeforemap like '%$number%' or secondary.srcuri like '%$number%' or secondary.dsturi like '%$number%' order by secondary.sessionid desc limit 1) order by main.id;";
 	if ($sid) $query = "select main.message, main.devicereportedtime, main.fromhost, main.id FROM systemevents_$device"."$date main WHERE sid like '%$sid%' order by main.id;";
 	if (!$query) $query = "select distinct on (sessionid) dsturibeforemap, sessionid, setuptime, id from systemevents_$device"."$date"."_cdr_formatted where dsturibeforemap like '%$number%' or srcuri like '%$number%' or dsturi like '%$number%' order by sessionid desc limit 20";
 
@@ -230,7 +229,7 @@ if (strlen($number)>0 || $sid) {
 			echo "none_sbc_device_data_bundle.push(device_data);\n";
 		}
 
-		//echo "console.log('".pg_num_rows($result)."');\n";
+		echo "console.log('".pg_num_rows($result)."');\n";
 		while($row = pg_fetch_assoc($result)) {
 			$messages_splitted = array();
 			if (!$sid_logged) {
@@ -239,7 +238,7 @@ if (strlen($number)>0 || $sid) {
 				$sid_logged = true;
 			}
 			$message = substr($row['message'], strpos($row['message'], "]")+1);
-			$message = substr($message, strpos($message, "]")+2); //this +2 might differ depending on (I guess) firmware version
+			//$message = substr($message, strpos($message, "]")+4); //this is sometimes need and the +2 might differ depending on (I think) firmware version
 			$message = str_replace("#012(", "#012((", $message);
 			$messages = explode("#012(", $message);
 			foreach ($messages as $key => $message) {
@@ -300,7 +299,6 @@ if (strlen($number)>0 || $sid) {
 								if ($resultt[2] == $interface_name) {
 									$sbc_sip_interface_ip = $ip;
 									echo "sbc_ip_used = '$ip';\n";
-									//echo "console.log(sbc_ip_used);\n";
 								}
 							}
 						}
@@ -563,6 +561,7 @@ async function drawSip() {
 					sip_message.response_code = split_action[1];
 					sip_message.type = sip_message.response_code + " " + split_action[2];
 					if (sip_message.response_code === "183" || sip_message.response_code === "404" || sip_message.response_code === "487" || sip_message.response_code === "302") sip_message.type += " " + split_action[3];
+					if (sip_message.response_code === "500") sip_message.type += " " + split_action[3] + " " + split_action[4];
 					if (sip_message.response_code === "481") sip_message.type += " " + split_action[3] + " " + split_action[4] + " " + split_action[5];
 					break;
 				case "ACK":

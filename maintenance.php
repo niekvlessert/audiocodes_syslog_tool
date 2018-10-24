@@ -168,7 +168,7 @@ function generateRsyslogConfig(){
 	$data .= "\$ActionResumeRetryCount -1   # infinite retries on insert failure\n";
 	foreach ($devices_to_log as $name => $ip) {
 		$data.="\$template $name"."_cdr,\"insert into SystemEvents_$name"."_%\$MONTH%_%\$DAY%_cdr (Message, Facility, FromHost, Priority, DeviceReportedTime, ReceivedAt, InfoUnitID, SysLogTag) values ('%msg%', %syslogfacility%, '%HOSTNAME%', %syslogpriority%, '%timereported:::date-pgsql%', '%timegenerated:::date-pgsql%', %iut%, '%syslogtag%')\",STDSQL\n";
-		$data.="\$template $name,\"insert into SystemEvents_$name"."_%\$MONTH%_%\$DAY% (SID, Message, OptionsDetected, Facility, FromHost, Priority, DeviceReportedTime, ReceivedAt, InfoUnitID, SysLogTag) values (regexp_matches('%msg%', E'SID=(.*)\\\]'), '%msg%', '%msg%' ~ 'OPTIONS sip:', %syslogfacility%, '%HOSTNAME%', %syslogpriority%, '%timereported:::date-pgsql%', '%timegenerated:::date-pgsql%', %iut%, '%syslogtag%')\",STDSQL\n";
+		$data.="\$template $name,\"insert into SystemEvents_$name"."_%\$MONTH%_%\$DAY% (SID, Message, OptionsDetected, Facility, FromHost, Priority, DeviceReportedTime, ReceivedAt, InfoUnitID, SysLogTag) values (regexp_matches('%msg%', E'SID=(.*?)\\\]'), '%msg%', '%msg%' ~ 'OPTIONS sip:', %syslogfacility%, '%HOSTNAME%', %syslogpriority%, '%timereported:::date-pgsql%', '%timegenerated:::date-pgsql%', %iut%, '%syslogtag%')\",STDSQL\n";
 		$data.="if \$fromhost-ip startswith '$ip' and \$syslogfacility-text == 'local1' then :ompgsql:127.0.0.1,syslog,syslog,syslog;$name"."_cdr\n";
 		$data.="& ~\n";
 		$data.="if \$fromhost-ip startswith '$ip' then :ompgsql:127.0.0.1,syslog,syslog,syslog;$name\n";

@@ -6,6 +6,8 @@ Audiocodes SBC devices create a lot of syslog information. They actually create 
 
 This tool has been created to be able to quickly browse through Audiocodes syslog information. You can search for calls in a webgui, the information of a call will be displayed in a SIP diagram and it's easy to skip through the call.
 
+Since Audiocodes changes the layout of the Syslog data sometimes, the script may break on older/newer versions. It's currently been tested on 7.20A.204.108.
+
 It needs some installation work. A script has been included that should do the hard work for you. This currently works fine on CentOS 7, it's untested for Debian, Ubuntu and CentOS 6 but it should be close for those. These are the general steps done by this script:
 
 - Install postgresql, php, rsyslog, webserver and git 
@@ -47,11 +49,12 @@ psql -U syslog
 select * from systemevents_<devicename>_<month>_<day>;
 ```
 
-Be careful; every day for every SBC logging needs a few tables. If your system doesn't have them Rsyslog will fill the database log files very quickly. They cronjob in /etc/cron.d/cron_ast takes care of this. You may run ast_maintenance without command line options to see the possibilitiet. Run with initializeDatabase to create the tables for today, use createDbTomorrow for the tables for tomorrow.
+Be careful; every day for every SBC logging needs a few tables. If your system doesn't have them Rsyslog will fill the database log files very quickly. They cronjob in /etc/cron.d/cron_ast takes care of this. You may run ast_maintenance without command line options to see the command line options. Run with initializeDatabase to create the tables for today, use createDbTomorrow for the tables for tomorrow, you will need to run this before the end of the day ovbviously.
 
 Todo
 
 - Search yesterday and before, only show the tables that have data
+- Remove usual stuff only
 - Sorting of the results seems off sometimes
 - Cronjob for deleting old data if the disk gets full
 - More information about calls after initial search
