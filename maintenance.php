@@ -52,7 +52,8 @@ function install(){
 		exec ("mkdir -p /opt/ast");
 		exec ("cp maintenance.php /opt/ast/ast_maintenance");
 		exec ("chmod +x /opt/ast/ast_maintenance");
-		exec ("cp settings.ini /opt/ast/");
+		if (!file_exists ("/opt/ast/settings.ini")) exec ("cp settings.ini /opt/ast/");
+		else echo "settings.ini file in /opt/ast already existed... leaving it intact...\n";
 
 		exec ("mkdir -p /var/www/html/ast");
 		exec ("cp index.php /var/www/html/ast/");
