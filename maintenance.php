@@ -216,6 +216,8 @@ function initializeDatabase($date){
 		$result = @pg_query("create LANGUAGE plpgsql;");
 
 		pg_close($db);
+
+		exec("createlang -U postgres -d syslog plpgsql");
 	}
 	
 	$db = pg_connect("host=$dbhost port=5432 dbname=$dbname user=$dbuser password=$dbpass") or die("error");
@@ -271,9 +273,9 @@ $$
 		$result = @pg_query($query);
 		if (strpos(pg_last_error($db), "already exists")>0) echo "Trigger Systemevents_".$name."_cdr_trigger already exists...\n"; else echo "Trigger Systemevents_".$name."_cdr_trigger created.\n";
 
-		$query="CREATE TABLE SystemEventsProperties_$name ( ID serial not null primary key, SystemEventID int NULL , ParamName varchar(255) NULL , ParamValue text NULL);";
-		$result = @pg_query($query);
-		if (strpos(pg_last_error($db), "already exists")>0) echo "Table SystemeventsProperties_$name already exists...\n"; else echo "Table SystemeventsProperties_$name created.\n";
+		#$query="CREATE TABLE SystemEventsProperties_$name ( ID serial not null primary key, SystemEventID int NULL , ParamName varchar(255) NULL , ParamValue text NULL);";
+		#$result = @pg_query($query);
+		#if (strpos(pg_last_error($db), "already exists")>0) echo "Table SystemeventsProperties_$name already exists...\n"; else echo "Table SystemeventsProperties_$name created.\n";
 
 		#$result = pg_query($db, "alter table systemevents_".$name." alter column id set default nextval('systemevents_".$name."_id_seq')"); //auto nextval doesn't come along..
 		echo "\n";

@@ -184,7 +184,7 @@ if (strlen($number)>0 || $sid) {
 	//echo "console.log('found sid length: $sid_length');\n";
 
 	if ($latest_call_only) $query = "select main.message, main.devicereportedtime, main.fromhost, main.id FROM systemevents_$device"."$date main WHERE main.sid = (select '{' || trim(secondary.sessionid::text) || '}' from systemevents_$device"."$date"."_cdr_formatted secondary where secondary.dsturibeforemap like '%$number%' or secondary.srcuri like '%$number%' or secondary.dsturi like '%$number%' order by secondary.sessionid desc limit 1) order by main.id;";
-	if ($sid) $query = "select main.message, main.devicereportedtime, main.fromhost, main.id FROM systemevents_$device"."$date main WHERE sid like '%$sid%' order by main.id;";
+	if ($sid) $query = "select main.message, main.devicereportedtime, main.fromhost, main.id, main.priority FROM systemevents_$device"."$date main WHERE sid like '%$sid%' order by main.id;";
 	if (!$query) $query = "select distinct on (sessionid) dsturibeforemap, sessionid, setuptime, id from systemevents_$device"."$date"."_cdr_formatted where dsturibeforemap like '%$number%' or srcuri like '%$number%' or dsturi like '%$number%' order by sessionid desc limit 20";
 
 /*
@@ -286,6 +286,7 @@ if (strlen($number)>0 || $sid) {
 					//echo"console.log('$message');\n";
 				} else {
 					echo "var siddata = {};\n";
+					echo "siddata.priority = \"".$row['priority']."\";\n";
 					echo "siddata.devicereportedtime = \"".$row['devicereportedtime']."\";\n";
 					echo "siddata.fromhost = \"".$row['fromhost']."\";\n";
 					echo "siddata.messagetype = \"".trim($message_type[1])."\";\n";
@@ -419,6 +420,7 @@ function addRow(i) {
                 }
                 break;
         default:
+		if (callog[i].priority==="4") div.style.color = "red";
                 if (callog[i].messagetype !== "other") div.innerHTML = "<b>"+callog[i].messagetype+"</b> - ";
                 message = message.replace('[ManSet','ManSet');
                 message = message.replace(/\[(.*?)\]/g,"");
