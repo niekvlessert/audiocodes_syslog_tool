@@ -71,7 +71,7 @@ iptables -I INPUT -p tcp --dport 80 -j ACCEPT
 iptables-save > /dev/null 2>&1
 echo "Disabling SELinux..."
 setenforce 0
-sed -i "s/SELINUXTYPE=targeted/SELINUXTYPE=disabled/g" /etc/selinux/config
+sed -i "s/SELINUX=enforcing/SELINUX=disabled/g" /etc/selinux/config
 
 cd audiocodes_syslog_tool
 php maintenance.php install
