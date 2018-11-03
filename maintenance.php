@@ -169,7 +169,9 @@ function generateRsyslogConfig(){
 	$data .= "\$ActionResumeRetryCount -1   # infinite retries on insert failure\n";
 	foreach ($devices_to_log as $name => $ip) {
 		$data.="\$template $name"."_cdr,\"insert into SystemEvents_$name"."_%\$MONTH%_%\$DAY%_cdr (Message, Facility, FromHost, Priority, DeviceReportedTime, ReceivedAt, InfoUnitID, SysLogTag) values ('%msg%', %syslogfacility%, '%HOSTNAME%', %syslogpriority%, '%timereported:::date-pgsql%', '%timegenerated:::date-pgsql%', %iut%, '%syslogtag%')\",STDSQL\n";
+		$data.="\$template $name"."_errors,\"insert into SystemEvents_$name"."_errors_%\$MONTH%_%\$DAY% (SID, Message, OptionsDetected, Facility, FromHost, Priority, DeviceReportedTime, ReceivedAt, InfoUnitID, SysLogTag) values (regexp_matches('%msg%', E'SID=(.*?)\\\]'), '%msg%', '%msg%' ~ 'OPTIONS sip:', %syslogfacility%, '%HOSTNAME%', %syslogpriority%, '%timereported:::date-pgsql%', '%timegenerated:::date-pgsql%', %iut%, '%syslogtag%')\",STDSQL\n";
 		$data.="\$template $name,\"insert into SystemEvents_$name"."_%\$MONTH%_%\$DAY% (SID, Message, OptionsDetected, Facility, FromHost, Priority, DeviceReportedTime, ReceivedAt, InfoUnitID, SysLogTag) values (regexp_matches('%msg%', E'SID=(.*?)\\\]'), '%msg%', '%msg%' ~ 'OPTIONS sip:', %syslogfacility%, '%HOSTNAME%', %syslogpriority%, '%timereported:::date-pgsql%', '%timegenerated:::date-pgsql%', %iut%, '%syslogtag%')\",STDSQL\n";
+		$data.="if \$fromhost-ip startswith '$ip' and \$syslogseverity-text != '5' then :ompgsql:127.0.0.1,syslog,syslog,syslog;$name"."_errors\n";
 		$data.="if \$fromhost-ip startswith '$ip' and \$syslogfacility-text == 'local1' then :ompgsql:127.0.0.1,syslog,syslog,syslog;$name"."_cdr\n";
 		$data.="& ~\n";
 		$data.="if \$fromhost-ip startswith '$ip' then :ompgsql:127.0.0.1,syslog,syslog,syslog;$name\n";
@@ -231,6 +233,10 @@ function initializeDatabase($date){
 		//echo $query."\n";
 		$result = @pg_query($query);
 		if (strpos(pg_last_error($db), "already exists")>0) echo "Table Systemevents_$name already exists...\n"; else echo "Table Systemevents_$name created.\n";
+
+		$query="CREATE TABLE SystemEvents_$name"."_errors ( ID serial not null primary key, CustomerID bigint, ReceivedAt timestamp without time zone NULL, DeviceReportedTime timestamp without time zone NULL, Facility smallint NULL, Priority smallint NULL, FromHost varchar(60) NULL, SID varchar(30), Message text, OptionsDetected boolean, NTSeverity int NULL, Importance int NULL, EventSource varchar(60), EventUser varchar(60) NULL, EventCategory int NULL, EventID int NULL, EventBinaryData text NULL, MaxAvailable int NULL, CurrUsage int NULL, MinUsage int NULL, MaxUsage int NULL, InfoUnitID int NULL , SysLogTag varchar(60), EventLogType varchar(60), GenericFileName VarChar(60), SystemID int NULL );";
+		$result = @pg_query($query);
+		if (strpos(pg_last_error($db), "already exists")>0) echo "Table Systemevents_$name"."_errors already exists...\n"; else echo "Table Systemevents_$name"."_errors created.\n";
 
 		$query="CREATE INDEX systemevents_$name"."_sid_index ON SystemEvents_$name ( sid);";
 		$result = @pg_query($query);
