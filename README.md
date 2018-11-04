@@ -46,7 +46,7 @@ Obviously you must set the Audiocodes device to log syslog data to the IP addres
 
 ```
 psql -U syslog
-select * from systemevents_<devicename>_<month>_<day>;
+select * from systemevents_<devicename>_<month>_<day> order by id desc limit 10;
 ```
 
 Be careful; every day for every SBC logging needs a few tables. If your system doesn't have them Rsyslog will fill the database log files very quickly. They cronjob in /etc/cron.d/cron_ast takes care of this. You may run ast_maintenance without command line options to see the command line options. Run with initializeDatabase to create the tables for today, use createDbTomorrow for the tables for tomorrow, you will need to run this before the end of the day ovbviously.
