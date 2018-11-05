@@ -7,6 +7,7 @@ parseIniFile();
 
 @$script = $argv[0];
 @$action = $argv[1];
+@$argument = $argv[2];
 
 if (!$action) stop();
 
@@ -29,6 +30,9 @@ case "initializeDatabase":
 case "generateRsyslogConfig":
 	generateRsyslogConfig();
 	break;
+case "deleteOldData":
+	deleteOldData($argument);
+	break;
 case "install":
 	install();
 	break;
@@ -39,7 +43,7 @@ default:
 function stop(){
 	global $script;
 
-	echo "Usage: php $script install|tableRotate|deleteOptionsRecords|initializeDatabase|createDbTomorrow|generateRsyslogConfig\n\n";
+	echo "Usage: php $script install|tableRotate|deleteOptionsRecords|initializeDatabase|createDbTomorrow|generateRsyslogConfig|deleteOldData\n\n";
 	exit;
 }
 
@@ -150,6 +154,21 @@ function deleteOptionsRecords($date){
 	pg_close($db);
 }
 
+function deleteOldData($days){
+	if (!$days) $days = 7;
+	$date = date("_m_d",strtotime("-".$days." days"));
+        global $devices_to_log, $one_week_ago;
+        global $dbhost, $dbname, $dbuser, $dbpass;
+        $db = pg_connect("host=$dbhost port=5432 dbname=$dbname user=$dbuser password=$dbpass") or die("error");
+        foreach ($devices_to_log as $name => $ip) {
+                $query="drop table systemevents_$name"."$date";
+                @$result = pg_query($db, $query);
+        }
+
+        pg_close($db);
+
+}
+
 function generateRsyslogConfig(){
         global $devices_to_log;
 
@@ -190,7 +209,8 @@ function generateCronEntries(){
 	$filename = "cron_ast";
 
 	$data="0 23 * * * root /opt/ast/ast_maintenance createDbTomorrow\n";
-	$data.="0 1 * * * root /opt/ast/ast_maintenance deleteOptionsRecords\n";
+	#$data.="0 1 * * * root /opt/ast/ast_maintenance deleteOptionsRecords\n";
+	$data.="30 23 * * * root /opt/ast/ast_maintenance deleteOldData\n";
 	file_put_contents($filename, $data);
 
 	exec ("cp $filename /etc/cron.d");

@@ -32,7 +32,7 @@ After that you must use the maintanance script that can take care of several tas
 - Initialise the database tables
 - Generate a config.php in the webdirectory for the GUI
 - Create the database tables for tomorrow
-- Generate a cron file
+- Generate a cron file which takes care of the required tasks (generating the tables for tomorrow and delete old data to avoid disk space issues).
 
 But before using it edit the settings.ini; then:
 
@@ -49,9 +49,9 @@ psql -U syslog
 select * from systemevents_<devicename>_<month>_<day> order by id desc limit 10;
 ```
 
-Be careful; every day for every SBC logging needs a few tables. If your system doesn't have them Rsyslog will fill the database log files very quickly. They cronjob in /etc/cron.d/cron_ast takes care of this. You may run ast_maintenance without command line options to see the command line options. Run with initializeDatabase to create the tables for today, use createDbTomorrow for the tables for tomorrow, you will need to run this before the end of the day ovbviously.
+Be careful; every day for every SBC logging needs a few tables. If your system doesn't have them Rsyslog will fill the database log files very quickly. The cronjob in /etc/cron.d/cron_ast takes care of this. You may run ast_maintenance without command line options to see the command line options. Run with initializeDatabase to create the tables for today (and the required user and database if needed), use createDbTomorrow for the tables for tomorrow, you will need to run this before the end of the day ovbviously. Use deleteOldData to delete old data. Obviously this depends on some factors, but the disk fills up quicker then you'd think. When postgres runs out of space things look grim; it's difficult to retreive any data. deleteOldData can have an argument, with that you can specify the amount of days in the past the data needs to be deleted from. CDR records will be preserved, it's the other bulk of logging that will be deleted.
 
-Updating
+## Updating
 
 When updating your settings.ini will be preserved
 
@@ -63,7 +63,7 @@ cd /opt/ast/
 ./ast_maintenance install
 ```
 
-Todo
+## Todo
 
 - Search yesterday and before, only show the tables that have data
 - Remove usual stuff only
