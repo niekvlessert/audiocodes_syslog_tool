@@ -72,6 +72,7 @@ fi
 if (( $RHEL7 == 1 ));
 then
 	firewall-cmd --permanent --add-service=syslog > /dev/null 2>&1
+	firewall-cmd --permanent --add-service=http > /dev/null 2>&1
 	firewall-cmd --reload > /dev/null 2>&1
 	echo "RHEL7/CentOS 7 detected... adding firewall rule using firewall-cmd"
 else

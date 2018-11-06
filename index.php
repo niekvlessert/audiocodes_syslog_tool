@@ -62,7 +62,7 @@ error_reporting(E_ALL);
 <div id="call_info1">
 <form id='form' method=get>
 <table>
-<tr><td>Called number starts with:</td><td><input id='number' name='number' type=text id='number'></td></tr>
+<tr><td>(Part of) involved phone number:</td><td><input id='number' name='number' type=text id='number'></td></tr>
 <tr><td>Device:</td><td><select name=device>
 <?
 foreach ($devices_to_log as $name => $ip) {
@@ -74,7 +74,7 @@ foreach ($devices_to_log as $name => $ip) {
 </select></td></tr>
 
 <tr><td>Latest call only:</td><td><input id='last_one_only' name='last_one_only' type=checkbox></td></tr>
-<tr><td>The usual stuff only:</td><td><input id='usual_stuff_only' name='usual_stuff_only' type=checkbox></td></tr>
+<!--<tr><td>The usual stuff only:</td><td><input id='usual_stuff_only' name='usual_stuff_only' type=checkbox></td></tr>-->
 </table>
 <input type="submit" style="position: absolute; left: -9999px"/>
 </form> 
@@ -103,7 +103,7 @@ var sip_dialog_position = 0;
 var sip_stack_message_found = false;
 var sip_message_found = false;
 var sid;
-var usual_stuff_only = false;
+//var usual_stuff_only = false;
 var latest_call_only = false;
 var sid_available = false;
 var ctx;
@@ -169,7 +169,7 @@ if (strlen($number)>0 || $sid) {
 	if ($sid) {
 		echo "sid_available = true\n";
 	}
-	if (@$_GET['usual_stuff_only'] == "on") echo "usual_stuff_only = true\n";
+	//if (@$_GET['usual_stuff_only'] == "on") echo "usual_stuff_only = true\n";
 
 	$db = pg_connect("host=$dbhost port=5432 dbname=$dbname user=$dbuser password=$dbpass") or die("error");
 	$query = NULL;
@@ -183,7 +183,7 @@ if (strlen($number)>0 || $sid) {
 	$sid_length = strlen($sid_data[1][0]);
 	//echo "console.log('found sid length: $sid_length');\n";
 
-	if ($latest_call_only) $query = "select main.message, main.devicereportedtime, main.fromhost, main.id FROM systemevents_$device"."$date main WHERE main.sid = (select '{' || trim(secondary.sessionid::text) || '}' from systemevents_$device"."$date"."_cdr_formatted secondary where secondary.dsturibeforemap like '%$number%' or secondary.srcuri like '%$number%' or secondary.dsturi like '%$number%' order by secondary.sessionid desc limit 1) order by main.id;";
+	if ($latest_call_only) $query = "select main.message, main.devicereportedtime, main.fromhost, main.id, main.priority FROM systemevents_$device"."$date main WHERE main.sid = (select '{' || trim(secondary.sessionid::text) || '}' from systemevents_$device"."$date"."_cdr_formatted secondary where secondary.dsturibeforemap like '%$number%' or secondary.srcuri like '%$number%' or secondary.dsturi like '%$number%' order by secondary.sessionid desc limit 1) order by main.id;";
 	if ($sid) $query = "select main.message, main.devicereportedtime, main.fromhost, main.id, main.priority FROM systemevents_$device"."$date main WHERE sid like '%$sid%' order by main.id;";
 	if (!$query) $query = "select distinct on (sessionid) dsturibeforemap, sessionid, setuptime, id from systemevents_$device"."$date"."_cdr_formatted where dsturibeforemap like '%$number%' or srcuri like '%$number%' or dsturi like '%$number%' order by sessionid desc limit 20";
 
@@ -337,7 +337,7 @@ if (strlen($number)>0 || $sid) {
 <hr/>
 <script>
 if (latest_call_only) document.getElementById("last_one_only").checked = true;
-if (usual_stuff_only) document.getElementById("usual_stuff_only").checked = true;
+//if (usual_stuff_only) document.getElementById("usual_stuff_only").checked = true;
 if (number) document.getElementById("number").value = number;
 
 function addRow(i) {
@@ -440,11 +440,11 @@ function addRow(i) {
 
 	div.className = callog[i].messagetype;
 
-	if (usual_stuff_only) { 
-		if (display_this_item) document.getElementById("callog").appendChild(div);
-	} else {
+	//if (usual_stuff_only) { 
+		//if (display_this_item) document.getElementById("callog").appendChild(div);
+	//} else {
 		if (document.getElementById(callog[i].messagetype).checked) document.getElementById("callog").appendChild(div);
-	}
+	//}
 }
 
 var message_types = [];
@@ -885,7 +885,7 @@ async function canvas_arrow(context, fromx, fromy, tox, toy, r){
 async function processMessageTypes() {
 	var div = document.createElement('div');
 	
-	if (!usual_stuff_only) {
+	//if (!usual_stuff_only) {
 		for (const item of callog) {
 			await addToMessageTypes(item);
 		}
@@ -903,7 +903,7 @@ async function processMessageTypes() {
 		div.innerHTML += " | <input type='button' onclick='setAllMessageTypes(true)' value='Enable all'/>";
 		div.innerHTML += "<hr/>";
 		document.getElementById("options").appendChild(div);
-	}
+	//}
 
 	await updateScreen();
 	await drawSip();
