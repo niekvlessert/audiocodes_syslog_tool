@@ -53,10 +53,16 @@ error_reporting(E_ALL);
 @$number = $_GET['number'];
 @$sid = $_GET['SID'];
 @$device = $_GET['device'];
+@$history = $_GET['history'];
 
 ?>
 
 <center><h1>Audiocodes Syslog Tool</h2></center>
+
+<?
+//if ($history) { echo"console.log('blaaat!!');\n"; }
+echo"$history"; 
+?>
 
 <div id="number_form" class="number_form">
 <div id="call_info1">
@@ -75,6 +81,7 @@ foreach ($devices_to_log as $name => $ip) {
 
 <tr><td>Latest call only:</td><td><input id='last_one_only' name='last_one_only' type=checkbox></td></tr>
 <!--<tr><td>The usual stuff only:</td><td><input id='usual_stuff_only' name='usual_stuff_only' type=checkbox></td></tr>-->
+<tr><td colspan=2>Click <a href=index.php?history=1>here</a> to search data from previous days if available...</td></tr>
 </table>
 <input type="submit" style="position: absolute; left: -9999px"/>
 </form> 
