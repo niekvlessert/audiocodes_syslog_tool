@@ -188,9 +188,9 @@ function generateRsyslogConfig(){
 	$data .= "\$ActionResumeRetryCount -1   # infinite retries on insert failure\n";
 	foreach ($devices_to_log as $name => $ip) {
 		$data.="\$template $name"."_cdr,\"insert into SystemEvents_$name"."_%\$MONTH%_%\$DAY%_cdr (Message, Facility, FromHost, Priority, DeviceReportedTime, ReceivedAt, InfoUnitID, SysLogTag) values ('%msg%', %syslogfacility%, '%HOSTNAME%', %syslogpriority%, '%timereported:::date-pgsql%', '%timegenerated:::date-pgsql%', %iut%, '%syslogtag%')\",STDSQL\n";
-		$data.="\$template $name"."_errors,\"insert into SystemEvents_$name"."_errors_%\$MONTH%_%\$DAY% (SID, Message, OptionsDetected, Facility, FromHost, Priority, DeviceReportedTime, ReceivedAt, InfoUnitID, SysLogTag) values (regexp_matches('%msg%', E'SID=(.*?)\\\]'), '%msg%', '%msg%' ~ 'OPTIONS sip:', %syslogfacility%, '%HOSTNAME%', %syslogpriority%, '%timereported:::date-pgsql%', '%timegenerated:::date-pgsql%', %iut%, '%syslogtag%')\",STDSQL\n";
+		#$data.="\$template $name"."_errors,\"insert into SystemEvents_$name"."_%\$MONTH%_%\$DAY%_errors (SID, Message, OptionsDetected, Facility, FromHost, Priority, DeviceReportedTime, ReceivedAt, InfoUnitID, SysLogTag) values (regexp_matches('%msg%', E'SID=(.*?)\\\]'), '%msg%', '%msg%' ~ 'OPTIONS sip:', %syslogfacility%, '%HOSTNAME%', %syslogpriority%, '%timereported:::date-pgsql%', '%timegenerated:::date-pgsql%', %iut%, '%syslogtag%')\",STDSQL\n";
 		$data.="\$template $name,\"insert into SystemEvents_$name"."_%\$MONTH%_%\$DAY% (SID, Message, OptionsDetected, Facility, FromHost, Priority, DeviceReportedTime, ReceivedAt, InfoUnitID, SysLogTag) values (regexp_matches('%msg%', E'SID=(.*?)\\\]'), '%msg%', '%msg%' ~ 'OPTIONS sip:', %syslogfacility%, '%HOSTNAME%', %syslogpriority%, '%timereported:::date-pgsql%', '%timegenerated:::date-pgsql%', %iut%, '%syslogtag%')\",STDSQL\n";
-		$data.="if \$fromhost-ip startswith '$ip' and \$syslogseverity-text != '5' then :ompgsql:127.0.0.1,syslog,syslog,syslog;$name"."_errors\n";
+		#$data.="if \$fromhost-ip startswith '$ip' and \$syslogseverity-text != '5' then :ompgsql:127.0.0.1,syslog,syslog,syslog;$name"."_errors\n";
 		$data.="if \$fromhost-ip startswith '$ip' and \$syslogfacility-text == 'local1' then :ompgsql:127.0.0.1,syslog,syslog,syslog;$name"."_cdr\n";
 		$data.="& ~\n";
 		$data.="if \$fromhost-ip startswith '$ip' then :ompgsql:127.0.0.1,syslog,syslog,syslog;$name\n";
@@ -295,9 +295,29 @@ $$
 		$query = "DROP TRIGGER systemevents_$name"."_cdr_trigger ON systemevents_$name"."_cdr";
 		$result = @pg_query($query);
 		$query = "CREATE TRIGGER systemevents_$name"."_cdr_trigger AFTER INSERT ON systemevents_$name"."_cdr FOR EACH ROW EXECUTE PROCEDURE insert_systemevents_$name"."_cdr_reformat();";
-		//echo $query."\n";
 		$result = @pg_query($query);
 		if (strpos(pg_last_error($db), "already exists")>0) echo "Trigger Systemevents_".$name."_cdr_trigger already exists...\n"; else echo "Trigger Systemevents_".$name."_cdr_trigger created.\n";
+
+$query="CREATE OR REPLACE FUNCTION systemevents_$name"."_copy_error() RETURNS trigger AS
+$$
+BEGIN
+IF NEW.priority<5 THEN
+INSERT INTO systemevents_$name"."_errors(id, customerid, receivedat, devicereportedtime, facility, priority, fromhost, message, ntseverity, importance, eventsource, eventuser, eventcategory, eventid, eventbinarydata, maxavailable, currusage, minusage, maxusage, infounitid, syslogtag, eventlogtype, genericfilename, systemid) VALUES(NEW.id, NEW.customerid, NEW.receivedat, NEW.devicereportedtime, NEW.facility, NEW.priority, NEW.fromhost, NEW.message, NEW.ntseverity, NEW.importance, NEW.eventsource, NEW.eventuser, NEW.eventcategory, NEW.eventid, NEW.eventbinarydata, NEW.maxavailable, NEW.currusage, NEW.minusage, NEW.maxusage, NEW.infounitid, NEW.syslogtag, NEW.eventlogtype, NEW.genericfilename, NEW.systemid);
+END IF;
+RETURN NEW;
+END;
+$$
+LANGUAGE plpgsql VOLATILE
+COST 100;
+";
+		$result = @pg_query($query);
+		if (strpos(pg_last_error($db), "already exists")>0) echo "Function insert_Systemevents_".$name."_errors already exists...\n"; else echo "Function insert_Systemevents_".$name."_errors created or replaced.\n";
+
+		$query = "DROP TRIGGER systemevents_$name"."_error_written ON systemevents_$name";
+		$result = @pg_query($query);
+		$query = "CREATE TRIGGER systemevents_$name"."_error_written AFTER INSERT ON systemevents_$name FOR EACH ROW EXECUTE PROCEDURE systemevents_$name"."_copy_error();";
+		$result = @pg_query($query);
+		if (strpos(pg_last_error($db), "already exists")>0) echo "Trigger systemevents_".$name."_error_written already exists...\n"; else echo "Trigger systemevents_".$name."_error_written created.\n";
 
 		#$query="CREATE TABLE SystemEventsProperties_$name ( ID serial not null primary key, SystemEventID int NULL , ParamName varchar(255) NULL , ParamValue text NULL);";
 		#$result = @pg_query($query);
