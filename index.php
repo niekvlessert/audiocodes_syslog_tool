@@ -184,24 +184,24 @@ if (strlen($number)>0 || $sid) {
 	$date = date("_m_d");
 
 	// find SID length
-	$result = pg_fetch_row(pg_query($db, "select message from systemevents_$device"."$date where message like '%[SID=%' limit 1"));
+	$result = pg_fetch_row(pg_query($db, "select message from $device"."$date where message like '%[SID=%' limit 1"));
 	//echo "console.log('".$result[0]."');\n";
 	preg_match_all('/\[SID=(.*?)\]/i', $result[0], $sid_data);
 	$sid_length = strlen($sid_data[1][0]);
 	//echo "console.log('found sid length: $sid_length');\n";
 
-	if ($latest_call_only) $query = "select main.message, main.devicereportedtime, main.fromhost, main.id, main.priority FROM systemevents_$device"."$date main WHERE main.sid = (select '{' || trim(secondary.sessionid::text) || '}' from systemevents_$device"."$date"."_cdr_formatted secondary where secondary.dsturibeforemap like '%$number%' or secondary.srcuri like '%$number%' or secondary.dsturi like '%$number%' order by secondary.sessionid desc limit 1) order by main.id;";
-	if ($sid) $query = "select main.message, main.devicereportedtime, main.fromhost, main.id, main.priority FROM systemevents_$device"."$date main WHERE sid like '%$sid%' order by main.id;";
-	if (!$query) $query = "select distinct on (sessionid) dsturibeforemap, sessionid, setuptime, id from systemevents_$device"."$date"."_cdr_formatted where dsturibeforemap like '%$number%' or srcuri like '%$number%' or dsturi like '%$number%' order by sessionid desc limit 20";
+	if ($latest_call_only) $query = "select main.message, main.devicereportedtime, main.fromhost, main.id, main.priority FROM $device"."$date main WHERE main.sid = (select '{' || trim(secondary.sessionid::text) || '}' from $device"."$date"."_cdr_formatted secondary where secondary.dsturibeforemap like '%$number%' or secondary.srcuri like '%$number%' or secondary.dsturi like '%$number%' order by secondary.sessionid desc limit 1) order by main.id;";
+	if ($sid) $query = "select main.message, main.devicereportedtime, main.fromhost, main.id, main.priority FROM $device"."$date main WHERE sid like '%$sid%' order by main.id;";
+	if (!$query) $query = "select distinct on (sessionid) dsturibeforemap, sessionid, setuptime, id from $device"."$date"."_cdr_formatted where dsturibeforemap like '%$number%' or srcuri like '%$number%' or dsturi like '%$number%' order by sessionid desc limit 20";
 
 /*
-	#if ($sid) $query = "select main.message, main.devicereportedtime, main.fromhost, main.id FROM systemevents_$device main WHERE substring(main.message from 13 for $sid_length) = (select substring(secondary.message from 13 for $sid_length) from systemevents_$device secondary where secondary.message LIKE '%$sid%' and secondary.message LIKE '%INVITE sip:%' order by secondary.id desc limit 1) order by main.id;";
+	#if ($sid) $query = "select main.message, main.devicereportedtime, main.fromhost, main.id FROM $device main WHERE substring(main.message from 13 for $sid_length) = (select substring(secondary.message from 13 for $sid_length) from $device secondary where secondary.message LIKE '%$sid%' and secondary.message LIKE '%INVITE sip:%' order by secondary.id desc limit 1) order by main.id;";
 	//echo "console.log('$query');\n";
-	#if (!$query) $query = "select distinct on (substring(message from 3 for $sid_length)) substring(message from 3 for $sid_length) as sid, substring(message, 'sip:([^@]+)@') as number, devicereportedtime as time from systemevents_$device where message like '%INVITE sip:%$number%' order by substring(message from 3 for $sid_length), id;";
-	#if (!$query) $query = "select distinct on (substring(message from 3 for $sid_length)) substring(message from 3 for $sid_length) as sid, substring(message, 'sip:([^@]+)@') as number, devicereportedtime as time from systemevents_$device where message ~ E'INVITE sip:\\d{0,10}".$number."\\d{0,10}' order by substring(message from 3 for $sid_length), id;";
-	#if (!$query) $query = "select sessionid, dsturibeforemap, setuptime from systemevents_$device"."_cdr_formatted where dsturi like '%$number%'";
+	#if (!$query) $query = "select distinct on (substring(message from 3 for $sid_length)) substring(message from 3 for $sid_length) as sid, substring(message, 'sip:([^@]+)@') as number, devicereportedtime as time from $device where message like '%INVITE sip:%$number%' order by substring(message from 3 for $sid_length), id;";
+	#if (!$query) $query = "select distinct on (substring(message from 3 for $sid_length)) substring(message from 3 for $sid_length) as sid, substring(message, 'sip:([^@]+)@') as number, devicereportedtime as time from $device where message ~ E'INVITE sip:\\d{0,10}".$number."\\d{0,10}' order by substring(message from 3 for $sid_length), id;";
+	#if (!$query) $query = "select sessionid, dsturibeforemap, setuptime from $device"."_cdr_formatted where dsturi like '%$number%'";
 	
-	#if (!$query) $query = "select distinct on (substring(message from 3 for 20)) substring(message from 3 for 20) as sid, substring(message, 'sip:([^@]+)@') as number, substring(message, '\[Time:(.*)\]') as time from systemevents_$device where message like '%INVITE sip:$number%' order by substring(message from 3 for 20), id;";
+	#if (!$query) $query = "select distinct on (substring(message from 3 for 20)) substring(message from 3 for 20) as sid, substring(message, 'sip:([^@]+)@') as number, substring(message, '\[Time:(.*)\]') as time from $device where message like '%INVITE sip:$number%' order by substring(message from 3 for 20), id;";
 	//$query = "select distinct(main.message), main.devicereportedtime, main.fromhost, main.id FROM systemevents main, systemevents secondary WHERE substring(main.message from 3 for 20) = substring(secondary.message from 3 for 20) AND secondary.message LIKE '%INVITE sip:$number%' order by id asc;";
 	//echo "console.log('".addslashes($query)."');\n";
 */

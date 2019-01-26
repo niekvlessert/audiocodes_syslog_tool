@@ -103,13 +103,13 @@ function generateConfigPhp(){
 
 	foreach ($devices_to_log as $name => $ip){
 		$result = pg_query($db, "begin");
-		$result = pg_query($db, "create table systemevents_".$name."_new (like systemevents_$name);");
-		$result = pg_query($db, "alter table systemevents_$name rename to systemevents_".$name."_".$date);
-		$result = pg_query($db, "alter table systemevents_".$name."_new rename to systemevents_".$name);
+		$result = pg_query($db, "create table ".$name."_new (like $name);");
+		$result = pg_query($db, "alter table $name rename to ".$name."_".$date);
+		$result = pg_query($db, "alter table ".$name."_new rename to ".$name);
 		$result = pg_query($db, "commit");
 		sleep (2);
-		$result = pg_query($db, "alter table systemevents_".$name." alter column id set default nextval('systemevents_".$name."_id_seq')"); //auto nextval doesn't come along..
-		echo "systemevents_$name rotated.\n";
+		$result = pg_query($db, "alter table ".$name." alter column id set default nextval('".$name."_id_seq')"); //auto nextval doesn't come along..
+		echo "$name rotated.\n";
 	}
 }*/
 
@@ -120,17 +120,17 @@ function deleteOptionsRecords($date){
 
 	foreach ($devices_to_log as $name => $ip) {
 		$name.=$date;
-		$query="delete from systemevents_$name where SID in (select sid from systemevents_$name where optionsdetected=true)";
+		$query="delete from $name where SID in (select sid from $name where optionsdetected=true)";
 		$result = pg_query($db, $query);
 	}
 
 	/*
-		$result = pg_query($db, "vacuum systemevents_$name");
-		#$query=pg_escape_string("select substring(main.message from E'\\[[^]]*\\]') as number from systemevents_$name main, systemevents_$name secondary WHERE substring(main.message from 3 for 20) = substring(secondary.message from 3 for 20) AND secondary.message LIKE '%OPTIONS sip%'");
-		#$result = pg_prepare($db, "my_query", "select substring(main.message from $1) as number from systemevents_$name main, systemevents_$name secondary WHERE substring(main.message from 3 for 20) = substring(secondary.message from 3 for 20) AND secondary.message LIKE '%OPTIONS sip%'");
+		$result = pg_query($db, "vacuum $name");
+		#$query=pg_escape_string("select substring(main.message from E'\\[[^]]*\\]') as number from $name main, $name secondary WHERE substring(main.message from 3 for 20) = substring(secondary.message from 3 for 20) AND secondary.message LIKE '%OPTIONS sip%'");
+		#$result = pg_prepare($db, "my_query", "select substring(main.message from $1) as number from $name main, $name secondary WHERE substring(main.message from 3 for 20) = substring(secondary.message from 3 for 20) AND secondary.message LIKE '%OPTIONS sip%'");
 		#$result = pg_execute($db, "my_query", array("E'\\[[^]]*\\]'"));
-		#$query = "select secondary.message from systemevents_$name main, systemevents_$name secondary WHERE substring(main.message from 3 for 20) = substring(secondary.message from 3 for 20) AND secondary.message LIKE '%OPTIONS sip%'";
-		$query = "select message from systemevents_$name where message like '%OPTIONS sip%';";
+		#$query = "select secondary.message from $name main, $name secondary WHERE substring(main.message from 3 for 20) = substring(secondary.message from 3 for 20) AND secondary.message LIKE '%OPTIONS sip%'";
+		$query = "select message from $name where message like '%OPTIONS sip%';";
 		$result = pg_query($db, $query);
 		echo "Options records to delete for $name: ".pg_num_rows($result)."\n";
 		$a = 0;
@@ -138,7 +138,7 @@ function deleteOptionsRecords($date){
 		while ($row = pg_fetch_row($result)){
 			//var_dump($row[0]);
 			$message = preg_match("/\[(.*)\]/",$row[0], $match);
-			$query2 = "delete from systemevents_$name where message like '%$match[1]%'";
+			$query2 = "delete from $name where message like '%$match[1]%'";
 			$a++;
 			if ($a==100) { 
 				echo ".";
@@ -148,7 +148,7 @@ function deleteOptionsRecords($date){
 			$result2 = pg_query($db, $query2);
 		}
 		echo "\n";
-		$result = pg_query($db, "vacuum systemevents_$name");
+		$result = pg_query($db, "vacuum $name");
 	}*/
 
 	pg_close($db);
@@ -161,7 +161,7 @@ function deleteOldData($days){
         global $dbhost, $dbname, $dbuser, $dbpass;
         $db = pg_connect("host=$dbhost port=5432 dbname=$dbname user=$dbuser password=$dbpass") or die("error");
         foreach ($devices_to_log as $name => $ip) {
-                $query="drop table systemevents_$name"."$date";
+                $query="drop table $name"."$date";
                 @$result = pg_query($db, $query);
         }
 
@@ -187,9 +187,9 @@ function generateRsyslogConfig(){
 	#$data .= "\$ActionQueueFileName dbq    # set file name, also enables disk mode\n";
 	$data .= "\$ActionResumeRetryCount -1   # infinite retries on insert failure\n";
 	foreach ($devices_to_log as $name => $ip) {
-		$data.="\$template $name"."_cdr,\"insert into SystemEvents_$name"."_%\$MONTH%_%\$DAY%_cdr (Message, Facility, FromHost, Priority, DeviceReportedTime, ReceivedAt, InfoUnitID, SysLogTag) values ('%msg%', %syslogfacility%, '%HOSTNAME%', %syslogpriority%, '%timereported:::date-pgsql%', '%timegenerated:::date-pgsql%', %iut%, '%syslogtag%')\",STDSQL\n";
-		#$data.="\$template $name"."_errors,\"insert into SystemEvents_$name"."_%\$MONTH%_%\$DAY%_errors (SID, Message, OptionsDetected, Facility, FromHost, Priority, DeviceReportedTime, ReceivedAt, InfoUnitID, SysLogTag) values (regexp_matches('%msg%', E'SID=(.*?)\\\]'), '%msg%', '%msg%' ~ 'OPTIONS sip:', %syslogfacility%, '%HOSTNAME%', %syslogpriority%, '%timereported:::date-pgsql%', '%timegenerated:::date-pgsql%', %iut%, '%syslogtag%')\",STDSQL\n";
-		$data.="\$template $name,\"insert into SystemEvents_$name"."_%\$MONTH%_%\$DAY% (SID, Message, OptionsDetected, Facility, FromHost, Priority, DeviceReportedTime, ReceivedAt, InfoUnitID, SysLogTag) values (regexp_matches('%msg%', E'SID=(.*?)\\\]'), '%msg%', '%msg%' ~ 'OPTIONS sip:', %syslogfacility%, '%HOSTNAME%', %syslogpriority%, '%timereported:::date-pgsql%', '%timegenerated:::date-pgsql%', %iut%, '%syslogtag%')\",STDSQL\n";
+		$data.="\$template $name"."_cdr,\"insert into $name"."_%\$MONTH%_%\$DAY%_cdr (Message, Facility, FromHost, Priority, DeviceReportedTime, ReceivedAt, InfoUnitID, SysLogTag) values ('%msg%', %syslogfacility%, '%HOSTNAME%', %syslogpriority%, '%timereported:::date-pgsql%', '%timegenerated:::date-pgsql%', %iut%, '%syslogtag%')\",STDSQL\n";
+		#$data.="\$template $name"."_errors,\"insert into $name"."_%\$MONTH%_%\$DAY%_errors (SID, Message, OptionsDetected, Facility, FromHost, Priority, DeviceReportedTime, ReceivedAt, InfoUnitID, SysLogTag) values (regexp_matches('%msg%', E'SID=(.*?)\\\]'), '%msg%', '%msg%' ~ 'OPTIONS sip:', %syslogfacility%, '%HOSTNAME%', %syslogpriority%, '%timereported:::date-pgsql%', '%timegenerated:::date-pgsql%', %iut%, '%syslogtag%')\",STDSQL\n";
+		$data.="\$template $name,\"insert into $name"."_%\$MONTH%_%\$DAY% (SID, Message, OptionsDetected, Facility, FromHost, Priority, DeviceReportedTime, ReceivedAt, InfoUnitID, SysLogTag) values (regexp_matches('%msg%', E'SID=(.*?)\\\]'), '%msg%', '%msg%' ~ 'OPTIONS sip:', %syslogfacility%, '%HOSTNAME%', %syslogpriority%, '%timereported:::date-pgsql%', '%timegenerated:::date-pgsql%', %iut%, '%syslogtag%')\",STDSQL\n";
 		#$data.="if \$fromhost-ip startswith '$ip' and \$syslogseverity-text != '5' then :ompgsql:127.0.0.1,syslog,syslog,syslog;$name"."_errors\n";
 		$data.="if \$fromhost-ip startswith '$ip' and \$syslogfacility-text == 'local1' then :ompgsql:127.0.0.1,syslog,syslog,syslog;$name"."_cdr\n";
 		$data.="& ~\n";
@@ -249,40 +249,40 @@ function initializeDatabase($date){
 	foreach ($devices_to_log as $name => $device) {
 		$name.=$date;
 
-		$query="CREATE TABLE SystemEvents_$name ( ID serial not null primary key, CustomerID bigint, ReceivedAt timestamp without time zone NULL, DeviceReportedTime timestamp without time zone NULL, Facility smallint NULL, Priority smallint NULL, FromHost varchar(60) NULL, SID varchar(30), Message text, OptionsDetected boolean, NTSeverity int NULL, Importance int NULL, EventSource varchar(60), EventUser varchar(60) NULL, EventCategory int NULL, EventID int NULL, EventBinaryData text NULL, MaxAvailable int NULL, CurrUsage int NULL, MinUsage int NULL, MaxUsage int NULL, InfoUnitID int NULL , SysLogTag varchar(60), EventLogType varchar(60), GenericFileName VarChar(60), SystemID int NULL );";
+		$query="CREATE TABLE $name ( ID serial not null primary key, CustomerID bigint, ReceivedAt timestamp without time zone NULL, DeviceReportedTime timestamp without time zone NULL, Facility smallint NULL, Priority smallint NULL, FromHost varchar(60) NULL, SID varchar(30), Message text, OptionsDetected boolean, NTSeverity int NULL, Importance int NULL, EventSource varchar(60), EventUser varchar(60) NULL, EventCategory int NULL, EventID int NULL, EventBinaryData text NULL, MaxAvailable int NULL, CurrUsage int NULL, MinUsage int NULL, MaxUsage int NULL, InfoUnitID int NULL , SysLogTag varchar(60), EventLogType varchar(60), GenericFileName VarChar(60), SystemID int NULL );";
 		//echo $query."\n";
 		$result = @pg_query($query);
-		if (strpos(pg_last_error($db), "already exists")>0) echo "Table Systemevents_$name already exists...\n"; else echo "Table Systemevents_$name created.\n";
+		if (strpos(pg_last_error($db), "already exists")>0) echo "Table $name already exists...\n"; else echo "Table $name created.\n";
 
-		$query="CREATE TABLE SystemEvents_$name"."_errors ( ID serial not null primary key, CustomerID bigint, ReceivedAt timestamp without time zone NULL, DeviceReportedTime timestamp without time zone NULL, Facility smallint NULL, Priority smallint NULL, FromHost varchar(60) NULL, SID varchar(30), Message text, OptionsDetected boolean, NTSeverity int NULL, Importance int NULL, EventSource varchar(60), EventUser varchar(60) NULL, EventCategory int NULL, EventID int NULL, EventBinaryData text NULL, MaxAvailable int NULL, CurrUsage int NULL, MinUsage int NULL, MaxUsage int NULL, InfoUnitID int NULL , SysLogTag varchar(60), EventLogType varchar(60), GenericFileName VarChar(60), SystemID int NULL );";
+		$query="CREATE TABLE $name"."_errors ( ID serial not null primary key, CustomerID bigint, ReceivedAt timestamp without time zone NULL, DeviceReportedTime timestamp without time zone NULL, Facility smallint NULL, Priority smallint NULL, FromHost varchar(60) NULL, SID varchar(30), Message text, OptionsDetected boolean, NTSeverity int NULL, Importance int NULL, EventSource varchar(60), EventUser varchar(60) NULL, EventCategory int NULL, EventID int NULL, EventBinaryData text NULL, MaxAvailable int NULL, CurrUsage int NULL, MinUsage int NULL, MaxUsage int NULL, InfoUnitID int NULL , SysLogTag varchar(60), EventLogType varchar(60), GenericFileName VarChar(60), SystemID int NULL );";
 		$result = @pg_query($query);
-		if (strpos(pg_last_error($db), "already exists")>0) echo "Table Systemevents_$name"."_errors already exists...\n"; else echo "Table Systemevents_$name"."_errors created.\n";
+		if (strpos(pg_last_error($db), "already exists")>0) echo "Table $name"."_errors already exists...\n"; else echo "Table $name"."_errors created.\n";
 
-		$query="CREATE INDEX systemevents_$name"."_sid_index ON SystemEvents_$name ( sid);";
+		$query="CREATE INDEX $name"."_sid_index ON $name ( sid);";
 		$result = @pg_query($query);
-		if (strpos(pg_last_error($db), "already exists")>0) echo "Index on SID in Systemevents_$name already exists...\n"; else echo "Index on SID on Systemevents_$name created.\n";
+		if (strpos(pg_last_error($db), "already exists")>0) echo "Index on SID in $name already exists...\n"; else echo "Index on SID on $name created.\n";
 
-		$query="CREATE TABLE SystemEvents_".$name."_cdr ( ID serial not null primary key, CustomerID bigint, ReceivedAt timestamp without time zone NULL, DeviceReportedTime timestamp without time zone NULL, Facility smallint NULL, Priority smallint NULL, FromHost varchar(60) NULL, Message text, NTSeverity int NULL, Importance int NULL, EventSource varchar(60), EventUser varchar(60) NULL, EventCategory int NULL, EventID int NULL, EventBinaryData text NULL, MaxAvailable int NULL, CurrUsage int NULL, MinUsage int NULL, MaxUsage int NULL, InfoUnitID int NULL , SysLogTag varchar(60), EventLogType varchar(60), GenericFileName VarChar(60), SystemID int NULL );";
+		$query="CREATE TABLE ".$name."_cdr ( ID serial not null primary key, CustomerID bigint, ReceivedAt timestamp without time zone NULL, DeviceReportedTime timestamp without time zone NULL, Facility smallint NULL, Priority smallint NULL, FromHost varchar(60) NULL, Message text, NTSeverity int NULL, Importance int NULL, EventSource varchar(60), EventUser varchar(60) NULL, EventCategory int NULL, EventID int NULL, EventBinaryData text NULL, MaxAvailable int NULL, CurrUsage int NULL, MinUsage int NULL, MaxUsage int NULL, InfoUnitID int NULL , SysLogTag varchar(60), EventLogType varchar(60), GenericFileName VarChar(60), SystemID int NULL );";
 		$result = @pg_query($query);
-		if (strpos(pg_last_error($db), "already exists")>0) echo "Table Systemevents_".$name."_cdr already exists...\n"; else echo "Table Systemevents_".$name."_cdr created.\n";
-		$result = pg_query($db, "alter table systemevents_".$name."_cdr alter column id set default nextval('systemevents_".$name."_cdr_id_seq')"); //auto nextval doesn't come along..
+		if (strpos(pg_last_error($db), "already exists")>0) echo "Table ".$name."_cdr already exists...\n"; else echo "Table ".$name."_cdr created.\n";
+		$result = pg_query($db, "alter table ".$name."_cdr alter column id set default nextval('".$name."_cdr_id_seq')"); //auto nextval doesn't come along..
 
-		$query= "CREATE TABLE systemevents_$name"."_cdr_formatted( id SERIAL PRIMARY KEY, SBCReportType VARCHAR, EPTyp VARCHAR, SIPCallId VARCHAR, SessionId VARCHAR, Orig VARCHAR, SourceIp VARCHAR, SourcePort VARCHAR, DestIp VARCHAR, DestPort VARCHAR, TransportType VARCHAR, SrcURI VARCHAR, SrcURIBeforeMap VARCHAR, DstURI VARCHAR, DstURIBeforeMap VARCHAR, Durat VARCHAR, TrmSd VARCHAR, TrmReason VARCHAR, TrmReasonCategory VARCHAR, SetupTime VARCHAR, ConnectTime VARCHAR, ReleaseTime VARCHAR, RedirectReason VARCHAR, RedirectUR VARCHAR, INum VARCHAR, RedirectURINumBeforeMap VARCHAR, TxSigIPDiffServ VARCHAR, IPGroup VARCHAR, SrdId VARCHAR, SIPInterfaceId VARCHAR, ProxySetId VARCHAR, IpProfileId VARCHAR, MediaRealmId VARCHAR, DirectMedia VARCHAR, SIPTrmReason VARCHAR, SIPTermDesc VARCHAR, Caller VARCHAR, Callee VARCHAR, Trigger VARCHAR, LegId VARCHAR);";
+		$query= "CREATE TABLE $name"."_cdr_formatted( id SERIAL PRIMARY KEY, SBCReportType VARCHAR, EPTyp VARCHAR, SIPCallId VARCHAR, SessionId VARCHAR, Orig VARCHAR, SourceIp VARCHAR, SourcePort VARCHAR, DestIp VARCHAR, DestPort VARCHAR, TransportType VARCHAR, SrcURI VARCHAR, SrcURIBeforeMap VARCHAR, DstURI VARCHAR, DstURIBeforeMap VARCHAR, Durat VARCHAR, TrmSd VARCHAR, TrmReason VARCHAR, TrmReasonCategory VARCHAR, SetupTime VARCHAR, ConnectTime VARCHAR, ReleaseTime VARCHAR, RedirectReason VARCHAR, RedirectUR VARCHAR, INum VARCHAR, RedirectURINumBeforeMap VARCHAR, TxSigIPDiffServ VARCHAR, IPGroup VARCHAR, SrdId VARCHAR, SIPInterfaceId VARCHAR, ProxySetId VARCHAR, IpProfileId VARCHAR, MediaRealmId VARCHAR, DirectMedia VARCHAR, SIPTrmReason VARCHAR, SIPTermDesc VARCHAR, Caller VARCHAR, Callee VARCHAR, Trigger VARCHAR, LegId VARCHAR);";
 		$result = @pg_query($query);
-		if (strpos(pg_last_error($db), "already exists")>0) echo "Table Systemevents_".$name."_cdr_formatted already exists...\n"; else echo "Table Systemevents_".$name."_cdr_formatted created.\n";
+		if (strpos(pg_last_error($db), "already exists")>0) echo "Table ".$name."_cdr_formatted already exists...\n"; else echo "Table ".$name."_cdr_formatted created.\n";
 
-		$query="CREATE INDEX systemevents_$name"."_cdr_formatted_to_index ON SystemEvents_$name ( sid);";
+		$query="CREATE INDEX $name"."_cdr_formatted_to_index ON $name ( sid);";
 		$result = @pg_query($query);
-		if (strpos(pg_last_error($db), "already exists")>0) echo "Index on SID in Systemevents_$name already exists...\n"; else echo "Index on SID on Systemevents_$name created.\n";
+		if (strpos(pg_last_error($db), "already exists")>0) echo "Index on SID in $name already exists...\n"; else echo "Index on SID on $name created.\n";
 
-$query= "CREATE OR REPLACE FUNCTION insert_systemevents_$name"."_cdr_reformat() RETURNS trigger AS
+$query= "CREATE OR REPLACE FUNCTION insert_$name"."_cdr_reformat() RETURNS trigger AS
 $$
 DECLARE
     a text[];
 BEGIN
 IF (SELECT NEW.message LIKE '%CALL_END%') THEN
         a := string_to_array(NEW.message,'|');
-        INSERT INTO systemevents_$name"."_cdr_formatted (SBCReportType, EPTyp, SIPCallId, SessionId, Orig, SourceIp, SourcePort, DestIp, DestPort, TransportType, SrcURI, SrcURIBeforeMap, DstURI, DstURIBeforeMap, Durat, TrmSd, TrmReason, TrmReasonCategory, SetupTime, ConnectTime, ReleaseTime, RedirectReason, RedirectUR, INum, RedirectURINumBeforeMap, TxSigIPDiffServ, IPGroup, SrdId, SIPInterfaceId, ProxySetId, IpProfileId, MediaRealmId, DirectMedia, SIPTrmReason, SIPTermDesc, Caller, Callee, Trigger, LegId) VALUES (a[2], a[3], a[4], a[5], a[6], a[7], a[8], a[9], a[10], a[11], a[12], a[13], a[14], a[15], a[16], a[17], a[18], a[19], a[20], a[21], a[22], a[23], a[24], a[0], a[25], a[26], a[27], a[28], a[29], a[30], a[31], a[32], a[33], a[34], a[35], a[36], a[37], a[38], a[1]);
+        INSERT INTO $name"."_cdr_formatted (SBCReportType, EPTyp, SIPCallId, SessionId, Orig, SourceIp, SourcePort, DestIp, DestPort, TransportType, SrcURI, SrcURIBeforeMap, DstURI, DstURIBeforeMap, Durat, TrmSd, TrmReason, TrmReasonCategory, SetupTime, ConnectTime, ReleaseTime, RedirectReason, RedirectUR, INum, RedirectURINumBeforeMap, TxSigIPDiffServ, IPGroup, SrdId, SIPInterfaceId, ProxySetId, IpProfileId, MediaRealmId, DirectMedia, SIPTrmReason, SIPTermDesc, Caller, Callee, Trigger, LegId) VALUES (a[2], a[3], a[4], a[5], a[6], a[7], a[8], a[9], a[10], a[11], a[12], a[13], a[14], a[15], a[16], a[17], a[18], a[19], a[20], a[21], a[22], a[23], a[24], a[0], a[25], a[26], a[27], a[28], a[29], a[30], a[31], a[32], a[33], a[34], a[35], a[36], a[37], a[38], a[1]);
 END IF;
 RETURN null;
 END
@@ -290,19 +290,19 @@ $$
   LANGUAGE 'plpgsql';";
 
 		$result = @pg_query($query);
-		if (strpos(pg_last_error($db), "already exists")>0) echo "Function insert_Systemevents_".$name."_cdr_formatted already exists...\n"; else echo "Function insert_Systemevents_".$name."_cdr_formatted created or replaced.\n";
+		if (strpos(pg_last_error($db), "already exists")>0) echo "Function insert_".$name."_cdr_formatted already exists...\n"; else echo "Function insert_".$name."_cdr_formatted created or replaced.\n";
 
-		$query = "DROP TRIGGER systemevents_$name"."_cdr_trigger ON systemevents_$name"."_cdr";
+		$query = "DROP TRIGGER $name"."_cdr_trigger ON $name"."_cdr";
 		$result = @pg_query($query);
-		$query = "CREATE TRIGGER systemevents_$name"."_cdr_trigger AFTER INSERT ON systemevents_$name"."_cdr FOR EACH ROW EXECUTE PROCEDURE insert_systemevents_$name"."_cdr_reformat();";
+		$query = "CREATE TRIGGER $name"."_cdr_trigger AFTER INSERT ON $name"."_cdr FOR EACH ROW EXECUTE PROCEDURE insert_$name"."_cdr_reformat();";
 		$result = @pg_query($query);
-		if (strpos(pg_last_error($db), "already exists")>0) echo "Trigger Systemevents_".$name."_cdr_trigger already exists...\n"; else echo "Trigger Systemevents_".$name."_cdr_trigger created.\n";
+		if (strpos(pg_last_error($db), "already exists")>0) echo "Trigger ".$name."_cdr_trigger already exists...\n"; else echo "Trigger ".$name."_cdr_trigger created.\n";
 
-$query="CREATE OR REPLACE FUNCTION systemevents_$name"."_copy_error() RETURNS trigger AS
+$query="CREATE OR REPLACE FUNCTION $name"."_copy_error() RETURNS trigger AS
 $$
 BEGIN
 IF NEW.priority<5 THEN
-INSERT INTO systemevents_$name"."_errors(id, customerid, receivedat, devicereportedtime, facility, priority, fromhost, message, ntseverity, importance, eventsource, eventuser, eventcategory, eventid, eventbinarydata, maxavailable, currusage, minusage, maxusage, infounitid, syslogtag, eventlogtype, genericfilename, systemid) VALUES(NEW.id, NEW.customerid, NEW.receivedat, NEW.devicereportedtime, NEW.facility, NEW.priority, NEW.fromhost, NEW.message, NEW.ntseverity, NEW.importance, NEW.eventsource, NEW.eventuser, NEW.eventcategory, NEW.eventid, NEW.eventbinarydata, NEW.maxavailable, NEW.currusage, NEW.minusage, NEW.maxusage, NEW.infounitid, NEW.syslogtag, NEW.eventlogtype, NEW.genericfilename, NEW.systemid);
+INSERT INTO $name"."_errors(id, customerid, receivedat, devicereportedtime, facility, priority, fromhost, message, ntseverity, importance, eventsource, eventuser, eventcategory, eventid, eventbinarydata, maxavailable, currusage, minusage, maxusage, infounitid, syslogtag, eventlogtype, genericfilename, systemid) VALUES(NEW.id, NEW.customerid, NEW.receivedat, NEW.devicereportedtime, NEW.facility, NEW.priority, NEW.fromhost, NEW.message, NEW.ntseverity, NEW.importance, NEW.eventsource, NEW.eventuser, NEW.eventcategory, NEW.eventid, NEW.eventbinarydata, NEW.maxavailable, NEW.currusage, NEW.minusage, NEW.maxusage, NEW.infounitid, NEW.syslogtag, NEW.eventlogtype, NEW.genericfilename, NEW.systemid);
 END IF;
 RETURN NEW;
 END;
@@ -311,19 +311,19 @@ LANGUAGE plpgsql VOLATILE
 COST 100;
 ";
 		$result = @pg_query($query);
-		if (strpos(pg_last_error($db), "already exists")>0) echo "Function insert_Systemevents_".$name."_errors already exists...\n"; else echo "Function insert_Systemevents_".$name."_errors created or replaced.\n";
+		if (strpos(pg_last_error($db), "already exists")>0) echo "Function insert_".$name."_errors already exists...\n"; else echo "Function insert_".$name."_errors created or replaced.\n";
 
-		$query = "DROP TRIGGER systemevents_$name"."_error_written ON systemevents_$name";
+		$query = "DROP TRIGGER $name"."_error_written ON $name";
 		$result = @pg_query($query);
-		$query = "CREATE TRIGGER systemevents_$name"."_error_written AFTER INSERT ON systemevents_$name FOR EACH ROW EXECUTE PROCEDURE systemevents_$name"."_copy_error();";
+		$query = "CREATE TRIGGER $name"."_error_written AFTER INSERT ON $name FOR EACH ROW EXECUTE PROCEDURE $name"."_copy_error();";
 		$result = @pg_query($query);
-		if (strpos(pg_last_error($db), "already exists")>0) echo "Trigger systemevents_".$name."_error_written already exists...\n"; else echo "Trigger systemevents_".$name."_error_written created.\n";
+		if (strpos(pg_last_error($db), "already exists")>0) echo "Trigger ".$name."_error_written already exists...\n"; else echo "Trigger ".$name."_error_written created.\n";
 
 		#$query="CREATE TABLE SystemEventsProperties_$name ( ID serial not null primary key, SystemEventID int NULL , ParamName varchar(255) NULL , ParamValue text NULL);";
 		#$result = @pg_query($query);
 		#if (strpos(pg_last_error($db), "already exists")>0) echo "Table SystemeventsProperties_$name already exists...\n"; else echo "Table SystemeventsProperties_$name created.\n";
 
-		#$result = pg_query($db, "alter table systemevents_".$name." alter column id set default nextval('systemevents_".$name."_id_seq')"); //auto nextval doesn't come along..
+		#$result = pg_query($db, "alter table ".$name." alter column id set default nextval('".$name."_id_seq')"); //auto nextval doesn't come along..
 		echo "\n";
 	}
 }
