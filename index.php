@@ -60,7 +60,6 @@ error_reporting(E_ALL);
 <center><h1>Audiocodes Syslog Tool</h2></center>
 
 <?
-//if ($history) { echo"console.log('blaaat!!');\n"; }
 echo"$history"; 
 ?>
 
@@ -80,7 +79,6 @@ foreach ($devices_to_log as $name => $ip) {
 </select></td></tr>
 
 <tr><td>Latest call only:</td><td><input id='last_one_only' name='last_one_only' type=checkbox></td></tr>
-<!--<tr><td>The usual stuff only:</td><td><input id='usual_stuff_only' name='usual_stuff_only' type=checkbox></td></tr>-->
 <tr><td colspan=2>Click <a href=index.php?history=1>here</a> to search data from previous days if available...</td></tr>
 </table>
 <input type="submit" style="position: absolute; left: -9999px"/>
@@ -104,13 +102,13 @@ foreach ($devices_to_log as $name => $ip) {
 </div>
 
 <script>
+//<pre>
 var callog = [];
 var sip_dialog_information = [];
 var sip_dialog_position = 0;
 var sip_stack_message_found = false;
 var sip_message_found = false;
 var sid;
-//var usual_stuff_only = false;
 var latest_call_only = false;
 var sid_available = false;
 var ctx;
@@ -131,6 +129,7 @@ var device_ip;
 var device_data_bundle = [];
 var none_sbc_device_data_bundle = [];
 var shown_id = 0;
+
 
 var keys = [];
 window.addEventListener("keydown",
@@ -165,9 +164,9 @@ function checkCombinations(e){
 
 <?
 
+// If there's a number in the input field or a SID available, do this
 if (strlen($number)>0 || $sid) {
 	echo "number = \"$number\";\n";
-	//echo "sid = \"$sid\"\n";
 	$latest_call_only = false;
 	if (@$_GET['last_one_only'] == "on") {
 		$latest_call_only = true;
@@ -176,22 +175,22 @@ if (strlen($number)>0 || $sid) {
 	if ($sid) {
 		echo "sid_available = true\n";
 	}
-	//if (@$_GET['usual_stuff_only'] == "on") echo "usual_stuff_only = true\n";
 
 	$db = pg_connect("host=$dbhost port=5432 dbname=$dbname user=$dbuser password=$dbpass") or die("error");
 	$query = NULL;
 
 	$date = date("_m_d");
+	//$date = date("_03_07"); // force date if needed for testing
 
 	// find SID length
 	$result = pg_fetch_row(pg_query($db, "select message from $device"."$date where message like '%[SID=%' limit 1"));
-	//echo "console.log('".$result[0]."');\n";
 	preg_match_all('/\[SID=(.*?)\]/i', $result[0], $sid_data);
 	$sid_length = strlen($sid_data[1][0]);
 	//echo "console.log('found sid length: $sid_length');\n";
 
 	if ($latest_call_only) $query = "select main.message, main.devicereportedtime, main.fromhost, main.id, main.priority FROM $device"."$date main WHERE main.sid = (select '{' || trim(secondary.sessionid::text) || '}' from $device"."$date"."_cdr_formatted secondary where secondary.dsturibeforemap like '%$number%' or secondary.srcuri like '%$number%' or secondary.dsturi like '%$number%' order by secondary.sessionid desc limit 1) order by main.id;";
 	if ($sid) $query = "select main.message, main.devicereportedtime, main.fromhost, main.id, main.priority FROM $device"."$date main WHERE sid like '%$sid%' order by main.id;";
+	// If no SID or latest_call_only use the number. So priority is on SID and latest_call_only
 	if (!$query) $query = "select distinct on (sessionid) dsturibeforemap, sessionid, setuptime, id from $device"."$date"."_cdr_formatted where dsturibeforemap like '%$number%' or srcuri like '%$number%' or dsturi like '%$number%' order by sessionid desc limit 20";
 
 /*
@@ -245,17 +244,16 @@ if (strlen($number)>0 || $sid) {
 				$sid_logged = true;
 			}
 			$message = substr($row['message'], strpos($row['message'], "]")+1);
+			//echo "-----------------------------------------------<br/>";
+			//print_r($message);
 			//$message = substr($message, strpos($message, "]")+4); //this is sometimes need and the +2 might differ depending on (I think) firmware version
 			$message = str_replace("#012(", "#012((", $message);
 			$messages = explode("#012(", $message);
 			foreach ($messages as $key => $message) {
 				$pos = strpos($message, "---- #012");
 				if($pos != 0) {
-					//echo $message."\n";
-					//echo "console.log('found!!: $pos.... ". substr($message,0,$pos)."');\n";
 					array_push($messages_splitted, substr($message,0,$pos));
 					array_push($messages_splitted, substr($message,$pos+9));
-					//echo "en: ". substr($message,$pos+9)."\n";
 					//echo "----------------------------------------------------------------------------------------------\n";
 				} else {
 					//echo"console.log('$message');\n";
@@ -263,35 +261,36 @@ if (strlen($number)>0 || $sid) {
 				}
 			}
 
-
 			//print_r($messages_splitted);
 			foreach ($messages_splitted as $message_splitted) {
+				// Strip SID etc. until actual message
 				if (preg_match('/\((.*?)\)/',substr($message_splitted,0,100), $message_type)) {
 					$message = substr($message_splitted, strpos($message_splitted, ")")+1);
-					//echo "console.log('$message_packet_number' + ' - ' + '$message_type[1]');\n";
-					//echo "console.log('$message_type[1]');\n";
-					//echo "console.log('$message');\n";
+					preg_match('/[a-zA-Z]+/',$message,$temp_message);
+					$message_type[1] = $temp_message[0];
 				} else {
+					// Nothing to strip, must be something else then usual (SIP data, --- Incoming SIP message, etc.), so better don't use any type: -null-
 					$message_type[1]="-null-";
 					$message = $message_splitted;
-					//echo "console.log(siddata['message']);\n";
-					//echo "console.log(siddata['messagetype']);\n";
-					if (strpos($message, 'RTP packets reorder') != 0) $message_type[1]="other";//$dont_log = true;
-					if (strlen($message)<100) $message_type[1]="other";//$dont_log = true;
+					$message = substr($message, strpos($message,"]")+1);
+					// Or some other types, just other
+					if (strpos($message, 'RTP packets reorder') != 0) $message_type[1]="other";
+					if (strlen($message)<100) $message_type[1]="other";
 				}
 
-				if (preg_match('/\((.*?)\)/',substr($message,0,100), $message_id)) {
+				// Sometimes more counters in there, strip them as well
+				if (preg_match('/\((.*?)\)/',substr($message,0,20), $message_id)) {
 					$message = substr($message, strpos($message, ")")+1);
-					//echo"console.log('$message');\n";
 				} else {
+					// why this?? I forgot... research later...
 					$message_id[1]="";
-					//echo"console.log('$message');\n";
 				}
 				if ($previous_message_type == "-null-" && $message_type[1] == "-null-") {
+					// If this happens it must be SIP information spread over multiple lines, merge this with the previous
 					echo "var siddata = callog.pop();\n";
 					echo "siddata.message += \"".trim(addslashes($message))."\";\n";
-					//echo"console.log('$message');\n";
 				} else {
+					// Otherwise the data is complete now, push the data
 					echo "var siddata = {};\n";
 					echo "siddata.priority = \"".$row['priority']."\";\n";
 					echo "siddata.devicereportedtime = \"".$row['devicereportedtime']."\";\n";
@@ -300,28 +299,26 @@ if (strlen($number)>0 || $sid) {
 					echo "siddata.messageid = \"".trim($message_id[1])."\";\n";
 					//echo "siddata.message = \"".trim(addslashes($row['message']))."\";\n";
 					echo "siddata.message = \"".trim(addslashes($message))."\";\n";
+					// See if the syslog goes to the correct SBC, if so fill the variable
 					if ($sbc_sip_interface_ip == "") {
 						if (strpos($message,"Incoming SIP Message from")!=0) {
 							preg_match('/(\()(.*?)(\))/',$message, $resultt);
 							foreach ($devices_to_log_ip_interfaces[$device] as $interface_name => $ip) {
-								if ($resultt[2] == $interface_name) {
+								//Previously checked IP address, but hostname can be in here as well, so just skip, not sure if that's perfect
+								//if ($resultt[2] == $interface_name) { 
 									$sbc_sip_interface_ip = $ip;
 									echo "sbc_ip_used = '$ip';\n";
-								}
+								//}
 							}
 						}
 					}
 				}
 				echo "callog.push(siddata);\n";
 
-				//echo "console.log(siddata.messagetype);\n";
-				//echo "console.log('".$row['message']."');\n";
-				//echo "console.log(siddata.message);\n";
 			}
 		}
 	} else {
 		$result_amount = pg_num_rows($result);
-		echo "console.log($result_amount);\n";
 		if (pg_num_rows($result)>0) {
 			echo "</script>";
 			echo "Calls found, please select:<br/><br/>";
@@ -344,13 +341,11 @@ if (strlen($number)>0 || $sid) {
 <hr/>
 <script>
 if (latest_call_only) document.getElementById("last_one_only").checked = true;
-//if (usual_stuff_only) document.getElementById("usual_stuff_only").checked = true;
 if (number) document.getElementById("number").value = number;
 
 function addRow(i) {
         var div = document.createElement('div');
 	var message = callog[i].message;
-	//console.log("ja:");
 	//console.log(callog[i].message.replace(/#012/g,"\n"));
 	//console.log("----------------------------------------------------------------");
 	var display_this_item = false;
@@ -366,7 +361,7 @@ function addRow(i) {
 		div.innerHTML += "<a class='sip_message' href='#' id='"+element_id+"'>" + message + "</a>";
 		element_id++;
 
-		//ugly fixes for ugly syslogging...
+		//ugly fixes for ugly syslogging... not in use now
 		/*if ((callog[i+2].message.indexOf("#012") !== -1) && (callog[i+1].message.indexOf("#012") == -1)) {
 				var tmp = callog[i+1];
 				callog[i+1] = callog[i+2];
@@ -383,42 +378,13 @@ function addRow(i) {
 
 		display_this_item = true;
                 break;
-        case "sip_stack":
+        case "SIPLadder":
                 var message_array = callog[i].message.split(" ");
                 if (message_array[0] === "----") {
                         div.style.color = "green";
                         message = message.replace("----","");
                         message = message.replace("----","<br/>");
 			div.innerHTML += "<hr><b>"+message+"</b><br/><br/>";
-
-			//for (j=i+5;j>i+1;j--) {
-			//	if (callog[j].message.indexOf("#012") !== -1) {
-			//		console.log("jep, match!!");
-			//		console.log(callog[i].message);
-			//		console.log("....en....");
-			//		console.log(callog[j].message);
-			//	}
-			//}
-			//console.log("---------------");
-			//ugly fixes for ugly syslogging...
-			/*if ((callog[i+4].message.indexOf("#012") !== -1) && (callog[i+3].message.indexOf("#012") == -1) && (callog[i+2].message.indexOf("#012") == -1) && (callog[i+1].message.indexOf("#012") == -1)) {
-					var tmp = callog[i+1];
-					callog[i+1] = callog[i+2];
-					callog[i+2] = callog[i+3];
-					callog[i+3] = callog[i+4];
-					callog[i+4] = tmp;
-			}
-			if ((callog[i+3].message.indexOf("#012") !== -1) && (callog[i+2].message.indexOf("#012") == -1) && (callog[i+1].message.indexOf("#012") == -1)) {
-					var tmp = callog[i+1];
-					callog[i+1] = callog[i+2];
-					callog[i+2] = callog[i+3];
-					callog[i+3] = tmp;
-			}
-			if ((callog[i+2].message.indexOf("#012") !== -1) && (callog[i+1].message.indexOf("#012") == -1)) {
-					var tmp = callog[i+1];
-					callog[i+1] = callog[i+2];
-					callog[i+2] = tmp;
-			}*/
 
 			display_this_item = true;
                 } else{
@@ -447,11 +413,7 @@ function addRow(i) {
 
 	div.className = callog[i].messagetype;
 
-	//if (usual_stuff_only) { 
-		//if (display_this_item) document.getElementById("callog").appendChild(div);
-	//} else {
-		if (document.getElementById(callog[i].messagetype).checked) document.getElementById("callog").appendChild(div);
-	//}
+	if (document.getElementById(callog[i].messagetype).checked) document.getElementById("callog").appendChild(div);
 }
 
 var message_types = [];
@@ -522,21 +484,22 @@ async function drawSip() {
 	var sip_message = {};
 	sip_message.direction = "";
 	callog.forEach(function(item) {
+		// if "-null-" it's SIP most of the time
 		if (item.messagetype === "-null-") {
 			if (sip_message_found) {
 				sip_message.message += item.message;
+				//console.log("sip message related to previous one... content added."+sip_message.message);
 				console.log("sip message related to previous one... content added.");
 			} else {
 				var split_message = item.message.split("#012");
 				var split_action = split_message[0].split(" ");
 				//console.log("split!!");
-				//console.log(split_action);
+				console.log(split_action);
 				//split_action.shift();
 				//split_action.shift();
 				//console.log(split_action);
 				switch (split_action[0]) { 
 				case "INVITE":
-					//console.log("--------- INVITE------------ ");
 					//console.log(split_action);
 					if (!sip_message.dst) {
 						if (split_action[1].lastIndexOf(";") !== -1) {
@@ -583,11 +546,12 @@ async function drawSip() {
 				}
 				sip_message.message = item.message;
 				sip_message.time = item.devicereportedtime.slice(item.devicereportedtime.indexOf(" "));
-				//console.log("type: " + sip_message.type);
-				sip_message_found = true;
+				console.log("type: " + sip_message.type);
+				console.log(sip_message);
+				//sip_message_found = true;
 			}
 		}
-		if (item.messagetype === "sip_stack") {
+		//if (item.messagetype === "SIPLadder") {
 			if (item.message.split(" ")[0] === "----") {
 				if (sip_message.direction !== "") {
 					//console.log("------------------------------------------------------");
@@ -606,12 +570,13 @@ async function drawSip() {
 		 		//if (sip_message.src) console.log("src: " + sip_message.src); else console.log("dst: "+ sip_message.dst);
 				sip_message_found = false;
 			}
-		}
+		//}
 	});
 
 	// nasty fix to avoid last item not being added to the array of dialog messages...
 	sip_dialog_information.push(sip_message);
 
+	console.log("draw...............");
 	// draw the stuff
 	//
 	// init
@@ -892,25 +857,23 @@ async function canvas_arrow(context, fromx, fromy, tox, toy, r){
 async function processMessageTypes() {
 	var div = document.createElement('div');
 	
-	//if (!usual_stuff_only) {
-		for (const item of callog) {
-			await addToMessageTypes(item);
-		}
+	for (const item of callog) {
+		await addToMessageTypes(item);
+	}
 
-		div.innerHTML += "Select types of messages to display:";
-		for (var item of message_types) {
-			if (item === "") item = "-null-";
-			if (item === "-null-") {
-				div.innerHTML += "<input type='checkbox' id='"+item+"' onchange='updateScreen(\""+item+"\")'checked />SIP | ";
-			} else {
-				div.innerHTML += "<input type='checkbox' id='"+item+"' onchange='updateScreen(\""+item+"\")'checked />"+item+" | ";
-			}
+	div.innerHTML += "Select types of messages to display:";
+	for (var item of message_types) {
+		if (item === "") item = "-null-";
+		if (item === "-null-") {
+			div.innerHTML += "<input type='checkbox' id='"+item+"' onchange='updateScreen(\""+item+"\")'checked />SIP | ";
+		} else {
+			div.innerHTML += "<input type='checkbox' id='"+item+"' onchange='updateScreen(\""+item+"\")'checked />"+item+" | ";
 		}
-		div.innerHTML += "<input type='button' onclick='setAllMessageTypes(false)' value='Disable all'/>";
-		div.innerHTML += " | <input type='button' onclick='setAllMessageTypes(true)' value='Enable all'/>";
-		div.innerHTML += "<hr/>";
-		document.getElementById("options").appendChild(div);
-	//}
+	}
+	div.innerHTML += "<input type='button' onclick='setAllMessageTypes(false)' value='Disable all'/>";
+	div.innerHTML += " | <input type='button' onclick='setAllMessageTypes(true)' value='Enable all'/>";
+	div.innerHTML += "<hr/>";
+	document.getElementById("options").appendChild(div);
 
 	await updateScreen();
 	await drawSip();
