@@ -6,11 +6,11 @@ Audiocodes SBC devices create a lot of syslog information. They actually create 
 
 This tool has been created to be able to quickly browse through Audiocodes syslog information. You can search for calls in a webgui, the information of a call will be displayed in a SIP diagram and it's easy to skip through the call.
 
+It's using an optimized rsyslog configuration that directly logs to a postgresql database, which uses triggers. With this configuration a lot of rsylog data can be handled.
+
 Here's a screenshot:
 
 ![sip_flow](https://user-images.githubusercontent.com/1013068/229315574-2a012684-9324-4a9b-bee4-e8e11438d99b.png)
-
-This tool has been created to be able to quickly browse through Audiocodes syslog information. You can search for calls in a webgui, the information of a call will be displayed in a SIP diagram and it's easy to skip through the call.
 
 Since Audiocodes changes the layout of the Syslog data sometimes, the script may break on older/newer versions. It's currently been tested on 7.20A.204.108.
 
