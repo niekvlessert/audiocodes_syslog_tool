@@ -12,7 +12,7 @@ Here's a screenshot:
 
 ![sip_flow](https://user-images.githubusercontent.com/1013068/229315574-2a012684-9324-4a9b-bee4-e8e11438d99b.png)
 
-Since Audiocodes changes the layout of the Syslog data sometimes, the script may break on older/newer versions. It's currently been tested on 7.20A.204.108.
+Since Audiocodes might change the layout of the syslog data sometimes, the script may break on older/newer versions. It's modified to work properly on at least v7.20A.259.221.
 
 It needs some installation work. A script has been included that should do the hard work for you. This currently works fine on CentOS 7, it's untested for Debian, Ubuntu and CentOS 6 but it should be close for those. These are the general steps done by this script:
 
