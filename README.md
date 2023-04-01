@@ -6,7 +6,7 @@ Audiocodes SBC devices create a lot of syslog information. They actually create 
 
 This tool has been created to be able to quickly browse through Audiocodes syslog information. You can search for calls in a webgui, the information of a call will be displayed in a SIP diagram and it's easy to skip through the call.
 
-It's using an optimized rsyslog configuration that directly logs to a postgresql database, which uses triggers. With this configuration a lot of rsylog data can be handled.
+It's using an optimized rsyslog configuration that directly logs to a postgresql database, which uses triggers. With this configuration a lot of syslog data can be handled.
 
 Here's a screenshot:
 
