@@ -6,6 +6,12 @@ Audiocodes SBC devices create a lot of syslog information. They actually create 
 
 This tool has been created to be able to quickly browse through Audiocodes syslog information. You can search for calls in a webgui, the information of a call will be displayed in a SIP diagram and it's easy to skip through the call.
 
+Here's a screenshot:
+
+![sip_flow](https://user-images.githubusercontent.com/1013068/229315574-2a012684-9324-4a9b-bee4-e8e11438d99b.png)
+
+This tool has been created to be able to quickly browse through Audiocodes syslog information. You can search for calls in a webgui, the information of a call will be displayed in a SIP diagram and it's easy to skip through the call.
+
 Since Audiocodes changes the layout of the Syslog data sometimes, the script may break on older/newer versions. It's currently been tested on 7.20A.204.108.
 
 It needs some installation work. A script has been included that should do the hard work for you. This currently works fine on CentOS 7, it's untested for Debian, Ubuntu and CentOS 6 but it should be close for those. These are the general steps done by this script:
