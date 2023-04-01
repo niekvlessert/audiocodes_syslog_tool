@@ -180,7 +180,7 @@ if (strlen($number)>0 || $sid) {
 	$query = NULL;
 
 	$date = date("_m_d");
-	//$date = date("_03_07"); // force date if needed for testing
+	// $date = date("_03_07"); // force date if needed for testing
 
 	// find SID length
 	$result = pg_fetch_row(pg_query($db, "select message from $device"."$date where message like '%[SID=%' limit 1"));
@@ -235,7 +235,7 @@ if (strlen($number)>0 || $sid) {
 			echo "none_sbc_device_data_bundle.push(device_data);\n";
 		}
 
-		echo "console.log('".pg_num_rows($result)."');\n";
+		//echo "console.log('".pg_num_rows($result)."');\n";
 		while($row = pg_fetch_assoc($result)) {
 			$messages_splitted = array();
 			if (!$sid_logged) {
@@ -489,12 +489,11 @@ async function drawSip() {
 			if (sip_message_found) {
 				sip_message.message += item.message;
 				//console.log("sip message related to previous one... content added."+sip_message.message);
-				console.log("sip message related to previous one... content added.");
 			} else {
 				var split_message = item.message.split("#012");
 				var split_action = split_message[0].split(" ");
 				//console.log("split!!");
-				console.log(split_action);
+				//console.log(split_action);
 				//split_action.shift();
 				//split_action.shift();
 				//console.log(split_action);
@@ -546,8 +545,8 @@ async function drawSip() {
 				}
 				sip_message.message = item.message;
 				sip_message.time = item.devicereportedtime.slice(item.devicereportedtime.indexOf(" "));
-				console.log("type: " + sip_message.type);
-				console.log(sip_message);
+				//console.log("type: " + sip_message.type);
+				//console.log(sip_message);
 				//sip_message_found = true;
 			}
 		}
@@ -576,7 +575,6 @@ async function drawSip() {
 	// nasty fix to avoid last item not being added to the array of dialog messages...
 	sip_dialog_information.push(sip_message);
 
-	console.log("draw...............");
 	// draw the stuff
 	//
 	// init
@@ -608,7 +606,7 @@ async function drawSip() {
 	 */
 
 	// vertical lines
-
+	//
 	vertical_line_length = (sip_dialog_information.length*30)+20;
 	for (var i = 0; i < sip_dialog_information.length; i++) {
 		// initial SIP message, take info from both legs..
@@ -620,7 +618,6 @@ async function drawSip() {
 			var ip_address;
 			if (sip_dialog_information[i].src) ip_address = sip_dialog_information[i].src;
 			else ip_address = "";
-			//console.log("Frommmmm: "+ ip_address);
 			var device = device_data_bundle.filter(function(device){return device.ip === ip_address;});
 			if (device[0]) vertical_line.device_name = device[0].name.toUpperCase();
 			else {
@@ -658,8 +655,7 @@ async function drawSip() {
 		} else {
 			var found_src = false;
 			var found_dst = false;
-			//console.log(vertical_lines);
-			//console.log(sip_dialog_information[i]);
+			//check if the source aleady exists, if not add a line
 			if (sip_dialog_information[i].src) {
 				for(var j = 0; j < vertical_lines.length; j++) {
 					if (vertical_lines[j].ip_address == sip_dialog_information[i].src) {
@@ -680,6 +676,7 @@ async function drawSip() {
 				}
 			}
 
+			//check if the destination aleady exists, if not add a line
 			if (sip_dialog_information[i].dst) {
 				//console.log(sip_dialog_information[i]);
 				for(var j = 0; j < vertical_lines.length; j++) {
@@ -689,11 +686,16 @@ async function drawSip() {
 						break;
 					}
 				}
+				// Don't forget the SBC IP from the config file...
+				if (sbc_ip_used === sip_dialog_information[i].dst) {
+					found_dst = true;
+				}
+
 				if (!found_dst) {
 					var vertical_line = {};
 
 					vertical_line.ip_address = sip_dialog_information[i].dst;
-					console.log(vertical_line.ip_address);
+					//console.log(vertical_line.ip_address);
 
 					//var ip_address = sip_dialog_information[i].dst.slice(5,sip_dialog_information[i].dst.indexOf(":"));
 					var ip_address = vertical_line.ip_address;
@@ -701,7 +703,7 @@ async function drawSip() {
 					if (device[0]) vertical_line.device_name = device[0].name;
 					else {
 						ip_address = ip_address.split(":")[0];
-						console.log(none_sbc_device_data_bundle);
+						//console.log(none_sbc_device_data_bundle);
 						var device = none_sbc_device_data_bundle.filter(function(device){return device.ip === ip_address;});
 						if (device[0]) vertical_line.device_name = device[0].name.toUpperCase();
 					}
