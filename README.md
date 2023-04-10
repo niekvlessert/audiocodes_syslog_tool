@@ -6,6 +6,8 @@ Audiocodes SBC devices create a lot of syslog information. They actually create 
 
 This tool has been created to be able to quickly browse through Audiocodes syslog information. You can search for calls in a webgui, the information of a call will be displayed in a SIP diagram and it's easy to skip through the call.
 
+Audiocodes has a tool for that as well, but it works by manually importing data, which is not doable in real life when you have many calls. There also is a payed enterprise grade tool, but it's expensive and interestingly enough it only shows the SIP information, not the Audiocodes internal log. For actual problem fixing the internal log is important; without that it remains guessing which parameter is causing the issue.
+
 It's using an optimized rsyslog configuration that directly logs to a postgresql database, which uses triggers. With this configuration a lot of syslog data can be handled.
 
 Here's a screenshot:
