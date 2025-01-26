@@ -50,7 +50,7 @@ But before using it edit the settings.ini; then:
 
 When done visit your webserver using Chrome/Firefox, the folder is /ast/.
 
-Obviously you must set the Audiocodes device to log syslog data to the IP address of your Syslog machine. You can then try the GUI after some calls have been made through the device, or have a look in the database if it's not working:
+Obviously you must set the Audiocodes device to log syslog data to the IP address of your Syslog machine. You need set "VoIP Debug Level" to "Detailed" level in AudioCdoes device so that it will send "CALL_END" CDR detail messages into rsyslog. You can then try the GUI after some calls have been made through the device, or have a look in the database if it's not working:
 
 ```
 psql -U syslog
